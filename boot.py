@@ -1,4 +1,5 @@
-from serial_connection import SlipListener, SlipSender, ContikiBootEvent
+from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPacketToSendEvent
+from interface_listener import InterfaceListener
 from utils.configuration_loader import ConfigurationLoader
 from data import Data
 import configparser
@@ -8,7 +9,7 @@ import os
 class Boot(object):
     _pwd = os.getcwd()
 
-    def __init__(self):
+    def __init__(self):     # todo add request for IP
         self._load_config()
         self._load_services()
         self._boot_event_subscribers()
@@ -20,14 +21,17 @@ class Boot(object):
         self._data = Data(self.configLoader.read_configuration("{0}/configuration/configuration.conf".format(self._pwd)))
         self._slip_sender = SlipSender(self._data.get_configuration()['serial']['device'])
         self._slip_listener = SlipListener(self._data.get_configuration()['serial']['device'], self._data)
+        self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'], self._data)
 
     def _boot_event_subscribers(self):
         self._slip_listener.get_input_parser().subscribe_event(ContikiBootEvent, self._slip_sender)
+        self._slip_listener.get_input_parser().subscribe_event(SlipPacketToSendEvent, self._interface_listener)
 
     def run(self):
         self._slip_sender.send(b'!we40b1x5\n')
         try:
             self._slip_listener.start()
+            self._interface_listener.start()
         except:
             print("Error: unable to start thread")
 

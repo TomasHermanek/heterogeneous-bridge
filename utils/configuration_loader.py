@@ -13,12 +13,15 @@ class ConfigurationLoader:
         read_config = {
             "border-router": {},
             "serial": {},
-            "metrics": {}
+            "metrics": {},
+            "wifi": {}
         }
         for section in self.confParser.sections():
             if section == 'border-router':
                 read_config[section]['ipv6'] = self.confParser[section]['ipv6']
             elif section == 'serial':
+                read_config[section]['device'] = self.confParser[section]['device']
+            elif section == 'wifi':
                 read_config[section]['device'] = self.confParser[section]['device']
             elif section == 'metrics':
                 read_config[section]['en'] = self.confParser[section]['en']

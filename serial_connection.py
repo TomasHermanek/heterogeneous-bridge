@@ -5,11 +5,19 @@ import serial
 
 
 class ContikiBootEvent(Event):
-    def __init__(self, entry: str):
-        Event.__init__(self, entry)
+    def __init__(self, line: str):
+        Event.__init__(self, line)
 
     def __str__(self):
-        return "rpl-update-table-event"
+        return "contiki-boot-event"
+
+
+class SlipPacketToSendEvent(Event):
+    def __init__(self, data: str):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "slip-packet-to-send-event"
 
 
 class InputParser(EventProducer):
@@ -17,12 +25,13 @@ class InputParser(EventProducer):
         EventProducer.__init__(self)
         self._data = data
         self.add_event_support(ContikiBootEvent)
+        self.add_event_support(SlipPacketToSendEvent)
 
     def parse(self, line):
         if line[:2] == b'!r':
             self._data.set_src_ip(line[2:-1])
         elif line[:2] == b'!p':
-            print("sending packet: {}".format(line[2:-1]))
+            self.notify_listeners(SlipPacketToSendEvent(line))
         elif line[:2] == b'!b':
             self.notify_listeners(ContikiBootEvent(line))
 
@@ -56,7 +65,8 @@ class SlipSender(EventListener):
         self._ser.write(msg)
 
     def notify(self, event: Event):
-        print("event\n")
         if isinstance(event, ContikiBootEvent):
-            print("contiki boot event")
             self.send(b'!we40b1x5\n')                       # todo refactor this
+
+    def __str__(self):
+        return "slip-sender"
