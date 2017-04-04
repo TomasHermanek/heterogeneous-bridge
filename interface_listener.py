@@ -7,6 +7,7 @@ from scapy.all import ETH_P_ALL
 from scapy.all import MTU
 import socket
 from scapy.all import *
+import logging
 
 
 class InterfaceListener(Thread, EventListener):
@@ -29,6 +30,11 @@ class InterfaceListener(Thread, EventListener):
 
     def notify(self, event: Event):     # todo refactor, move packet creation to another service
         if isinstance(event, SlipPacketToSendEvent):
+            if not self._data.get_src_ip():
+                logging.getLogger("scapy.runtime").warning("Src IPv6 address of Contiki device is unknown, "
+                                                           "can not send packet\n")
+                return
+
             packet_to_send = event.get_event()
             print("sending packet: {}".format(packet_to_send[2:-1]))
 
@@ -39,7 +45,7 @@ class InterfaceListener(Thread, EventListener):
             ip_w = IPv6()
             ip_w.dst = self._data.get_configuration()['border-router']['ipv6']
             ip_r = IPv6()
-            ip_r.src = self._data.get_src_ip().decode("utf-8")
+            ip_r.src = self._data.get_src_ip()
             ip_r.dst = values[0]
             udp = UDP()
             udp.sport = int(values[1])

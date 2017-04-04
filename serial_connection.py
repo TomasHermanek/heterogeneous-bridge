@@ -29,7 +29,11 @@ class InputParser(EventProducer):
 
     def parse(self, line):
         if line[:2] == b'!r':
-            self._data.set_src_ip(line[2:-1])
+            line = line.decode("utf-8")
+            addresses = line[2:-1].split(';')
+            for address in addresses:
+                if address[:4] != "fe80" and address != "":
+                    self._data.set_src_ip(address)
         elif line[:2] == b'!p':
             self.notify_listeners(SlipPacketToSendEvent(line))
         elif line[:2] == b'!b':
@@ -56,7 +60,7 @@ class SlipListener(Thread):
                 print(line)
 
 
-class SlipSender(EventListener):
+class SlipSender:
     def __init__(self, device: str):
         self._ser = serial.Serial(port=device, baudrate=115200, parity=serial.PARITY_NONE,
                                   stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=0)
@@ -64,9 +68,23 @@ class SlipSender(EventListener):
     def send(self, msg: bytes):
         self._ser.write(msg)
 
+
+class SlipCommands(EventListener):
+    def __init__(self, slip_sender: SlipSender, data: Data):
+        self._slip_sender = slip_sender
+        self._data = data
+
+    def send_config_to_contiki(self):
+        metrics = self._data.get_configuration()['metrics']
+        cmd = "!we{}b{}x{}\n".format(metrics['en'], metrics['bw'], metrics['etx'])
+        self._slip_sender.send(str.encode(cmd))
+
+    def request_config_from_contiki(self):
+        self._slip_sender.send(b'?c\n')
+
     def notify(self, event: Event):
         if isinstance(event, ContikiBootEvent):
-            self.send(b'!we40b1x5\n')                       # todo refactor this
+            self.send_config_to_contiki()
 
     def __str__(self):
-        return "slip-sender"
+        return "slip-commands"
