@@ -1,0 +1,2 @@
+scapy-python3==0.20
+pyserial==3.3
