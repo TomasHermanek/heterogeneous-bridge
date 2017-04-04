@@ -1,5 +1,5 @@
 from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPacketToSendEvent, SlipCommands
-from interface_listener import InterfaceListener
+from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent
 from utils.configuration_loader import ConfigurationLoader
 from data import Data
 import configparser
@@ -21,12 +21,16 @@ class Boot(object):
         self._data = Data(self.configLoader.read_configuration("{0}/configuration/configuration.conf".format(self._pwd)))
         self._slip_sender = SlipSender(self._data.get_configuration()['serial']['device'])
         self._slip_listener = SlipListener(self._data.get_configuration()['serial']['device'], self._data)
-        self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'], self._data)
+        self._packet_parser = Ipv6PacketParser(self._data)
+        self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'],
+                                                     self._packet_parser, self._data)
         self._slip_commands = SlipCommands(self._slip_sender, self._data)
 
     def _boot_event_subscribers(self):
         self._slip_listener.get_input_parser().subscribe_event(ContikiBootEvent, self._slip_commands)
         self._slip_listener.get_input_parser().subscribe_event(SlipPacketToSendEvent, self._interface_listener)
+        self._interface_listener.get_ipv6_packet_parser().subscribe_event(IncomingPacketSendToSlipEvent,
+                                                                          self._slip_commands)
 
     def run(self):
         try:

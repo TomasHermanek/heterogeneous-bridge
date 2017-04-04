@@ -82,9 +82,15 @@ class SlipCommands(EventListener):
     def request_config_from_contiki(self):
         self._slip_sender.send(b'?c\n')
 
+    def send_packet_to_contiki(self, raw_packet: str):
+        self._slip_sender.send(str.encode("!p{}\n".format(raw_packet)))
+
     def notify(self, event: Event):
+        from interface_listener import IncomingPacketSendToSlipEvent
         if isinstance(event, ContikiBootEvent):
             self.send_config_to_contiki()
+        elif isinstance(event, IncomingPacketSendToSlipEvent):
+            self.send_packet_to_contiki(event.get_event())
 
     def __str__(self):
         return "slip-commands"

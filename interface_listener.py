@@ -1,6 +1,6 @@
 from threading import Thread
 from data import Data
-from event_system import EventListener, Event
+from event_system import EventListener, Event, EventProducer
 from serial_connection import SlipPacketToSendEvent
 import time
 from scapy.all import ETH_P_ALL
@@ -10,11 +10,48 @@ from scapy.all import *
 import logging
 
 
+class IncomingPacketSendToSlipEvent(Event):
+    def __init__(self, data: str):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "incoming-packet-to-slip-event"
+
+
+class Ipv6PacketParser(EventProducer):
+    def __init__(self, data: Data):
+        EventProducer.__init__(self)
+        self._data = data
+        self.add_event_support(IncomingPacketSendToSlipEvent)
+
+    def _parse_udp(self, packet: Ether):
+        ip = packet[IPv6]
+        # print("comparing {} vs {}".format(ip[1].dst, self._data.get_src_ip()))
+        if ip[1].dst == self._data.get_src_ip():
+            # print("target is my mote")
+            udp = packet[UDP]
+            raw = packet[Raw]
+            contiki_packet = "{};{};{};{};{}".format(ip[1].src, ip[1].dst, udp.sport, udp.dport, raw.load.decode("utf-8"))
+            self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
+
+    def parse(self, packet: Ether):
+        if not self._data.get_src_ip():
+            logging.getLogger("scapy.runtime").warning("Src IPv6 address of Contiki device is unknown, "
+                                                       "can not compare incoming packet\n")
+            return
+        if UDP in packet:
+            self._parse_udp(packet)
+
+
 class InterfaceListener(Thread, EventListener):
-    def __init__(self, iface, data: Data):
+    def __init__(self, iface, packet_parser: Ipv6PacketParser, data: Data):
         Thread.__init__(self)
         self.iface = iface
         self._data = data
+        self._packetParser = packet_parser
+
+    def get_ipv6_packet_parser(self):
+        return self._packetParser
 
     def run(self):
         time.sleep(5)
@@ -25,8 +62,8 @@ class InterfaceListener(Thread, EventListener):
             packet, info = socks.recvfrom(MTU)
             ether_packet = Ether(packet)
             if info[2] != socket.PACKET_OUTGOING:
-                None
-                # print(ether_packet)
+                if IPv6 in ether_packet:
+                    self._packetParser.parse(ether_packet)
 
     def notify(self, event: Event):     # todo refactor, move packet creation to another service
         if isinstance(event, SlipPacketToSendEvent):
