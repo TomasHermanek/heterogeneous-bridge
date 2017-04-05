@@ -8,6 +8,7 @@ from scapy.all import MTU
 import socket
 from scapy.all import *
 import logging
+import ipaddress
 
 
 class IncomingPacketSendToSlipEvent(Event):
@@ -31,7 +32,9 @@ class Ipv6PacketParser(EventProducer):
             # print("target is my mote")
             udp = packet[UDP]
             raw = packet[Raw]
-            contiki_packet = "{};{};{};{};{}".format(ip[1].src, ip[1].dst, udp.sport, udp.dport, raw.load.decode("utf-8"))
+            src_addr = ipaddress.ip_address(ip[1].src)
+            dst_addr = ipaddress.ip_address(ip[1].dst)
+            contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport, raw.load.decode("utf-8"))
             self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
 
     def parse(self, packet: Ether):
