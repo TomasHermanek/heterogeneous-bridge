@@ -36,8 +36,7 @@ class Ipv6PacketParser(EventProducer):
 
     def parse(self, packet: Ether):
         if not self._data.get_src_ip():
-            logging.getLogger("scapy.runtime").warning("Src IPv6 address of Contiki device is unknown, "
-                                                       "can not compare incoming packet\n")
+            logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not compare incoming packet')
             return
         if UDP in packet:
             self._parse_udp(packet)
@@ -68,12 +67,11 @@ class InterfaceListener(Thread, EventListener):
     def notify(self, event: Event):     # todo refactor, move packet creation to another service
         if isinstance(event, SlipPacketToSendEvent):
             if not self._data.get_src_ip():
-                logging.getLogger("scapy.runtime").warning("Src IPv6 address of Contiki device is unknown, "
-                                                           "can not send packet\n")
+                logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
                 return
 
             packet_to_send = event.get_event()
-            print("sending packet: {}".format(packet_to_send[2:-1]))
+            print("sending packet: {}".format(packet_to_send))
 
             packet_to_send_decoded = packet_to_send[2:-1].decode("utf-8")
             values = packet_to_send_decoded.split(";")
@@ -88,6 +86,7 @@ class InterfaceListener(Thread, EventListener):
             udp.sport = int(values[1])
             udp.dport = int(values[2])
             send(ip_w/ip_r/udp/values[3])
+            logging.debug('BRIDGE:sending packet using "{}"'.format(self.iface))
 
     def __str__(self):
         return "interface-listener"

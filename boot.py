@@ -4,12 +4,18 @@ from utils.configuration_loader import ConfigurationLoader
 from data import Data
 import configparser
 import os
+import logging
 
 
 class Boot(object):
     _pwd = os.getcwd()
 
     def __init__(self):
+        logging.basicConfig(filename='prod.log', level=logging.DEBUG, format='%(asctime)s :%(levelname)s:%(message)s',
+                            datefmt='%m/%d/%Y %I:%M:%S %p')
+        os.chmod("prod.log", 436)
+        logging.info('BRIDGE:starting bridge')
+
         self._load_config()
         self._load_services()
         self._boot_event_subscribers()
