@@ -46,7 +46,10 @@ class Ipv6PacketParser(EventProducer):
             logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not compare incoming packet')
             return
         if UDP in packet:
-            self._parse_udp(packet)
+            try:
+                self._parse_udp(packet)
+            except Exception as e:
+                logging.error('BRIDGE:{}'.format(str(e)))
 
 
 class InterfaceListener(Thread, EventListener):

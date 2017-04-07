@@ -11,7 +11,7 @@ class Boot(object):
     _pwd = os.getcwd()
 
     def __init__(self):
-        logging.basicConfig(filename='prod.log', level=logging.DEBUG, format='%(asctime)s :%(levelname)s:%(message)s',
+        logging.basicConfig(filename='prod.log', level=logging.DEBUG, format='%(asctime)s [%(levelname)s] %(message)s',
                             datefmt='%m/%d/%Y %I:%M:%S %p')
         os.chmod("prod.log", 436)
         logging.info('BRIDGE:starting bridge')
