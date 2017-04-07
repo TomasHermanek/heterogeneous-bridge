@@ -25,10 +25,14 @@ class Ipv6PacketParser(EventProducer):
         self._data = data
         self.add_event_support(IncomingPacketSendToSlipEvent)
 
+    """
+    Packed sent from another mote via WIFI must contains two IP headers, first one is used by internal WIFI, but second
+    one contains motes global IPv6 address
+    """
     def _parse_udp(self, packet: Ether):
         ip = packet[IPv6]
         # print("comparing {} vs {}".format(ip[1].dst, self._data.get_src_ip()))
-        if ip[1].dst == self._data.get_src_ip():
+        if IPv6 in ip and ip[1].dst == self._data.get_src_ip():
             # print("target is my mote")
             udp = packet[UDP]
             raw = packet[Raw]
