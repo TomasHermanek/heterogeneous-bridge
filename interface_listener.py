@@ -32,7 +32,7 @@ class Ipv6PacketParser(EventProducer):
     def _parse_udp(self, packet: Ether):
         ip = packet[IPv6]
         # print("comparing {} vs {}".format(ip[1].dst, self._data.get_src_ip()))
-        if IPv6 in ip and ip[1].dst == self._data.get_src_ip():
+        if IPv6 in ip and ip[1].dst == self._data.get_global_address():
             # print("target is my mote")
             udp = packet[UDP]
             raw = packet[Raw]
@@ -42,7 +42,7 @@ class Ipv6PacketParser(EventProducer):
             self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
 
     def parse(self, packet: Ether):
-        if not self._data.get_src_ip():
+        if not self._data.get_global_address():
             logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not compare incoming packet')
             return
         if UDP in packet:
@@ -76,7 +76,7 @@ class InterfaceListener(Thread, EventListener):
 
     def notify(self, event: Event):     # todo refactor, move packet creation to another service
         if isinstance(event, SlipPacketToSendEvent):
-            if not self._data.get_src_ip():
+            if not self._data.get_global_address():
                 logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
                 return
 
@@ -90,7 +90,7 @@ class InterfaceListener(Thread, EventListener):
             ip_w = IPv6()
             ip_w.dst = self._data.get_configuration()['border-router']['ipv6']
             ip_r = IPv6()
-            ip_r.src = self._data.get_src_ip()
+            ip_r.src = self._data.get_global_address()
             ip_r.dst = values[0]
             udp = UDP()
             udp.sport = int(values[1])
