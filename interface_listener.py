@@ -19,11 +19,20 @@ class IncomingPacketSendToSlipEvent(Event):
         return "incoming-packet-to-slip-event"
 
 
+class MoteNeighbourSolicitationEvent(Event):
+    def __init__(self, data: dict):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "mote-neighbour-solicitation-event"
+
+
 class Ipv6PacketParser(EventProducer):
     def __init__(self, data: Data):
         EventProducer.__init__(self)
         self._data = data
         self.add_event_support(IncomingPacketSendToSlipEvent)
+        self.add_event_support(MoteNeighbourSolicitationEvent)
 
     """
     Packed sent from another mote via WIFI must contains two IP headers, first one is used by internal WIFI, but second
@@ -38,8 +47,21 @@ class Ipv6PacketParser(EventProducer):
             raw = packet[Raw]
             src_addr = ipaddress.ip_address(ip[1].src)
             dst_addr = ipaddress.ip_address(ip[1].dst)
-            contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport, raw.load.decode("utf-8"))
+            contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport,
+                                                     raw.load.decode("utf-8"))
             self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
+
+    def _parse_icmpv6_ns(self, packet: Ether):
+        target_ip = packet[ICMPv6ND_NS].tgt
+        src_ip = packet[IPv6].src
+
+        if str(self._data.get_global_address()) == target_ip or str(self._data.get_link_local_address()) == target_ip:
+            logging.warning('BRIDGE:Sending response to ICMPv6 neighbour solicitation for address "{}"'
+                            .format(target_ip))
+            self.notify_listeners(MoteNeighbourSolicitationEvent({
+                "src_ip": src_ip,
+                "target_ip": target_ip
+            }))
 
     def parse(self, packet: Ether):
         if not self._data.get_global_address():
@@ -50,6 +72,8 @@ class Ipv6PacketParser(EventProducer):
                 self._parse_udp(packet)
             except Exception as e:
                 logging.error('BRIDGE:{}'.format(str(e)))
+        if ICMPv6ND_NS in packet:
+            self._parse_icmpv6_ns(packet)
 
 
 class PacketSender(EventListener):
@@ -76,8 +100,14 @@ class PacketSender(EventListener):
         icmp = ICMPv6ND_NS()
         icmp.tgt = str(ip_addr)
         send(ip / icmp)
-        logging.debug('BRIDGE:sending neighbour solicitation for target ip "{}"'
-                      .format(ip_addr))
+        logging.debug('BRIDGE:sending neighbour solicitation for target ip "{}"'.format(ip_addr))
+
+    def _send_icmpv6_na(self, src_ip: str, target_ip: str):
+        ip = IPv6()
+        ip.dst = src_ip
+        icmp = ICMPv6ND_NA()
+        icmp.tgt = target_ip
+        send(ip / icmp)
 
     def notify(self, event: Event):
         if isinstance(event, SlipPacketToSendEvent):
@@ -92,6 +122,8 @@ class PacketSender(EventListener):
         elif isinstance(event, NewNodeEvent):
             self._send_icmpv6_ns(event.get_event().get_ip_address())
 
+        elif isinstance(event, MoteNeighbourSolicitationEvent):
+            self._send_icmpv6_na(src_ip=event.get_event()["src_ip"], target_ip=event.get_event()["target_ip"])
 
     def __str__(self):
         return "packet-sender"

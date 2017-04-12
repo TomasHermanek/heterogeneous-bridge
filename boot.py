@@ -1,7 +1,8 @@
 from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPacketToSendEvent, SlipCommands, \
     InputParser
 from timers import NeighbourRequestTimer, PurgeTimer
-from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender
+from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender, \
+    MoteNeighbourSolicitationEvent
 from utils.configuration_loader import ConfigurationLoader
 from data import Data, NodeTable, NewNodeEvent
 import configparser
@@ -47,6 +48,7 @@ class Boot(object):
         self._interface_listener.get_ipv6_packet_parser().subscribe_event(IncomingPacketSendToSlipEvent,
                                                                           self._slip_commands)
         self._node_table.subscribe_event(NewNodeEvent, self._packed_sender)
+        self._packet_parser.subscribe_event(MoteNeighbourSolicitationEvent, self._packed_sender)
 
     def run(self):
         try:
