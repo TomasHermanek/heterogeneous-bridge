@@ -98,6 +98,7 @@ class PacketSender(EventListener):
     def _send_icmpv6_ns(self, ip_addr: ipaddress.IPv6Address):
         ip = IPv6()
         ip.src = self._data.get_wifi_global_address()
+        print("sending icmp using global ip {}".format(self._data.get_wifi_global_address()))
         ip.dst = "ff02::1"
         icmp = ICMPv6ND_NS()
         icmp.tgt = str(ip_addr)

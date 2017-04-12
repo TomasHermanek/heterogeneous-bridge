@@ -43,8 +43,9 @@ class Data:
 
 
 class IpConfigurator(EventListener):
-    def __init__(self, iface: str, prefix: str, root_address: str):
+    def __init__(self, data: Data, iface: str, prefix: str, root_address: str):
         self._iface = iface
+        self._data = data
         self._root_address = root_address
         self._prefix = IPv6Network(prefix)
 
@@ -79,7 +80,7 @@ class IpConfigurator(EventListener):
         last_ocet = mote_global_address.split(":")[-1]
         wifi_global_address = str(self._prefix).replace("::", "::{}".format(last_ocet))
         self._set_address(wifi_global_address)
-        return
+        self._data.set_wifi_global_address(wifi_global_address.split("/")[0])
 
     def notify(self, event: Event):
         from serial_connection import SettingMoteGlobalAddressEvent, ChangeModeEvent

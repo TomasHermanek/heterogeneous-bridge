@@ -11,6 +11,7 @@ class NeighbourRequestTimer(Thread):
         self._slip_commands = slip_commands
 
     def run(self):
+        time.sleep(5)
         while 1:
             self._slip_commands.request_neighbours_from_contiki()
             time.sleep(self._neighbours_request_time)

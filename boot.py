@@ -39,7 +39,7 @@ class Boot(object):
         self._slip_commands = SlipCommands(self._slip_sender, self._data)
         self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data)
         self._neighbour_request_timer = NeighbourRequestTimer(10, self._slip_commands)
-        self._ip_configurator = IpConfigurator(self._data.get_configuration()['wifi']['device'],
+        self._ip_configurator = IpConfigurator(self._data, self._data.get_configuration()['wifi']['device'],
                                                self._data.get_configuration()['wifi']['subnet'],
                                                self._data.get_configuration()['border-router']['ipv6'])
         self._purge_timer = PurgeTimer(1, self._node_table)
@@ -57,14 +57,18 @@ class Boot(object):
     def run(self):
         try:
             self._slip_listener.start()
+        except:
+            print("Error: unable to start thread")
+
+        self._slip_commands.request_config_from_contiki()
+        self._slip_commands.send_config_to_contiki()
+        # todo create mechanism which handles fact, that while init boot is not complete -> other listeners must wait
+        try:
             self._interface_listener.start()
             self._neighbour_request_timer.start()
             self._purge_timer.start()
         except:
             print("Error: unable to start thread")
-
-        self._slip_commands.send_config_to_contiki()
-        self._slip_commands.request_config_from_contiki()
         while 1:
             pass
 
