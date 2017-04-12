@@ -84,6 +84,7 @@ class PacketSender(EventListener):
     def _packet_send(self, packet: str):
         values = packet.split(";")
         ip_w = IPv6()
+        ip_w.src = self._data.get_wifi_global_address()
         ip_w.dst = self._data.get_configuration()['border-router']['ipv6']
         ip_r = IPv6()
         ip_r.src = self._data.get_mote_global_address()
@@ -96,6 +97,7 @@ class PacketSender(EventListener):
 
     def _send_icmpv6_ns(self, ip_addr: ipaddress.IPv6Address):
         ip = IPv6()
+        ip.src = self._data.get_wifi_global_address()
         ip.dst = "ff02::1"
         icmp = ICMPv6ND_NS()
         icmp.tgt = str(ip_addr)
@@ -104,6 +106,7 @@ class PacketSender(EventListener):
 
     def _send_icmpv6_na(self, src_ip: str, target_ip: str):
         ip = IPv6()
+        ip.src = self._data.get_wifi_global_address()
         ip.dst = src_ip
         icmp = ICMPv6ND_NA()
         icmp.tgt = target_ip

@@ -5,9 +5,47 @@ import os
 from ipaddress import IPv6Address, IPv6Network, AddressValueError
 
 
+class Data:
+    MODE_ROOT = 1
+    MODE_NODE = 2
+
+    def __init__(self, configuration):
+        self._mote_global_address = None
+        self._mote_link_local_address = None
+        self._wifi_global_address = None
+        self._mode = self.MODE_NODE
+        self._configuration = configuration
+
+    def set_mode(self, mode: int):
+        if mode == self.MODE_NODE or mode == self.MODE_ROOT:
+            self._mode = mode
+
+    def set_wifi_global_address(self, global_address):
+        self._wifi_global_address = global_address
+
+    def get_wifi_global_address(self):
+        return self._wifi_global_address
+
+    def set_mote_global_address(self, global_address):
+        self._mote_global_address = global_address
+
+    def get_mote_global_address(self):
+        return self._mote_global_address
+
+    def set_mote_link_local_address(self, link_local_address):
+        self._mote_link_local_address = link_local_address
+
+    def get_mote_link_local_address(self):
+        return self._mote_link_local_address
+
+    def get_configuration(self):
+        return self._configuration
+
+
 class IpConfigurator(EventListener):
-    def __init__(self, iface: str, prefix: str):
+    def __init__(self, iface: str, prefix: str, root_address: str):
         self._iface = iface
+        self._root_address = root_address
         self._prefix = IPv6Network(prefix)
 
     def _unset_address(self, address: str):
@@ -35,9 +73,6 @@ class IpConfigurator(EventListener):
             except AddressValueError:
                 logging.warning('BRIDGE:interface "{}" has not valid ipv6 address "{}"'.format(self._iface, address))
 
-    def remove_root_address(self, root_address: str):
-        pass #todo implement remove configured border router address
-
     def set_wifi_ipv6_lobal_address(self, mote_global_address: str):        # todo check if address to remove and address to add is not same
         current_addresses = self._get_wifi_global_address()
         self._remove_current_addresses_from_prefix(current_addresses)
@@ -47,41 +82,18 @@ class IpConfigurator(EventListener):
         return
 
     def notify(self, event: Event):
-        from serial_connection import SettingMoteGlobalAddressEvent
+        from serial_connection import SettingMoteGlobalAddressEvent, ChangeModeEvent
         if isinstance(event, SettingMoteGlobalAddressEvent):
             self.set_wifi_ipv6_lobal_address(event.get_event())
+        elif isinstance(event, ChangeModeEvent):
+            mode = event.get_event()
+            if mode == Data.MODE_NODE:
+                self._unset_address(self._root_address)
+            elif mode == Data.MODE_ROOT:
+                self._set_address(self._root_address)
 
     def __str__(self):
         return "ip-configurator"
-
-
-class Data:
-    def __init__(self, configuration):
-        self._mote_global_address = None
-        self._mote_link_local_address = None
-        self._wifi_global_address = None
-        self._configuration = configuration
-
-    def set_wifi_global_address(self, global_address):
-        self._wifi_global_address = global_address
-
-    def get_wifi_global_address(self):
-        return self._wifi_global_address
-
-    def set_mote_global_address(self, global_address):
-        self._mote_global_address = global_address
-
-    def get_mote_global_address(self):
-        return self._mote_global_address
-
-    def set_mote_link_local_address(self, link_local_address):
-        self._mote_link_local_address = link_local_address
-
-    def get_mote_link_local_address(self):
-        return self._mote_link_local_address
-
-    def get_configuration(self):
-        return self._configuration
 
 
 class NodeAddress:
@@ -169,7 +181,7 @@ class NodeTable(EventProducer):
 
     def decrease_lifetime(self):
         for tech_type in self._types:
-            for node_key in self._nodes[tech_type]:
+            for node_key in list(self._nodes[tech_type]):
                 node = self._nodes[tech_type][node_key]
                 node.decrease_lifetime()
                 if node.get_lifetime() <= 0:
