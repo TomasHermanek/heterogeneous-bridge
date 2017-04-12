@@ -3,7 +3,7 @@ from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPa
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent
 from utils.configuration_loader import ConfigurationLoader
-from data import Data, NodeTable
+from data import Data, NodeTable, NewNodeEvent
 import configparser
 import os
 import logging
@@ -38,7 +38,7 @@ class Boot(object):
         self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'],
                                                      self._packet_parser, self._data)
         self._slip_commands = SlipCommands(self._slip_sender, self._data)
-        self._neighbour_request_timer = NeighbourRequestTimer(60, self._slip_commands)
+        self._neighbour_request_timer = NeighbourRequestTimer(10, self._slip_commands)
         self._purge_timer = PurgeTimer(1, self._node_table)
 
     def _boot_event_subscribers(self):
@@ -46,6 +46,7 @@ class Boot(object):
         self._slip_listener.get_input_parser().subscribe_event(SlipPacketToSendEvent, self._interface_listener)
         self._interface_listener.get_ipv6_packet_parser().subscribe_event(IncomingPacketSendToSlipEvent,
                                                                           self._slip_commands)
+        self._node_table.subscribe_event(NewNodeEvent, self._interface_listener)
 
     def run(self):
         try:

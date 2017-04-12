@@ -1,5 +1,5 @@
 from threading import Thread
-from data import Data
+from data import Data, NewNodeEvent
 from event_system import EventListener, Event, EventProducer
 from serial_connection import SlipPacketToSendEvent
 import time
@@ -74,6 +74,7 @@ class InterfaceListener(Thread, EventListener):
                 if IPv6 in ether_packet:
                     self._packetParser.parse(ether_packet)
 
+    # todo make new class which will be responsible for packet send
     def notify(self, event: Event):     # todo refactor, move packet creation to another service
         if isinstance(event, SlipPacketToSendEvent):
             if not self._data.get_global_address():
@@ -97,6 +98,15 @@ class InterfaceListener(Thread, EventListener):
             udp.dport = int(values[2])
             send(ip_w/ip_r/udp/values[3])
             logging.debug('BRIDGE:sending packet using "{}"'.format(self.iface))
+
+        elif isinstance(event, NewNodeEvent):
+            ip = IPv6()
+            ip.dst = "ff02::1"
+            icmp = ICMPv6ND_NS()
+            icmp.tgt = str(event.get_event().get_ip_address())
+            send(ip/icmp)
+            logging.debug('BRIDGE:sending neighbour solicitation for target ip "{}"'
+                          .format(event.get_event().get_ip_address()))
 
     def __str__(self):
         return "interface-listener"

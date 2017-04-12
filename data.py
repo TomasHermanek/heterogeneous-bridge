@@ -1,4 +1,5 @@
 from ipaddress import IPv6Address
+from event_system import EventProducer, Event
 import logging
 
 
@@ -67,8 +68,18 @@ class NodeAddress:
         return "IP address: {}, lifetime: {}".format(str(self._ip_address), self._lifetime)
 
 
-class NodeTable:
+class NewNodeEvent(Event):
+    def __init__(self, data: NodeAddress):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "new-node-event"
+
+
+class NodeTable(EventProducer):
     def __init__(self, types: list):
+        EventProducer.__init__(self)
+        self.add_event_support(NewNodeEvent)
         self._nodes = {}
         self._types = types
         for tech_type in types:
@@ -77,7 +88,7 @@ class NodeTable:
             })
 
     def node_exists(self, address: NodeAddress):
-        pass
+        pass # todo implement
 
     def add_node_address(self, node_address: NodeAddress):
         if str(node_address.get_ip_address()) not in self._nodes[node_address.get_tech_type()]:
@@ -85,6 +96,7 @@ class NodeTable:
                 str(node_address.get_ip_address()): node_address
             })
             logging.debug('BRIDGE:added new node address "{}"'.format(node_address))
+            self.notify_listeners(NewNodeEvent(node_address))
         else:
             self._nodes[node_address.get_tech_type()][str(node_address.get_ip_address())].reset_lifetime()
             logging.debug('BRIDGE:refreshed node lifetime "{}"'.format(node_address))
