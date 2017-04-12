@@ -41,7 +41,7 @@ class Ipv6PacketParser(EventProducer):
     def _parse_udp(self, packet: Ether):
         ip = packet[IPv6]
         # print("comparing {} vs {}".format(ip[1].dst, self._data.get_src_ip()))
-        if IPv6 in ip and ip[1].dst == self._data.get_mote_global_address():
+        if ip[1].dst == self._data.get_mote_global_address():
             # print("target is my mote")
             udp = packet[UDP]
             raw = packet[Raw]
@@ -67,7 +67,7 @@ class Ipv6PacketParser(EventProducer):
         if not self._data.get_mote_global_address():
             logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not compare incoming packet')
             return
-        if UDP in packet:
+        if IPv6 in packet and UDP in packet:
             try:
                 self._parse_udp(packet)
             except Exception as e:
@@ -76,10 +76,34 @@ class Ipv6PacketParser(EventProducer):
             self._parse_icmpv6_ns(packet)
 
 
+class PendingEntry:
+    def __init__(self, address: str):
+        self._address = address
+        self.attempt = 0
+
+
+class PendingSolicitations:
+    def __init__(self):
+        self._pendings = {}
+
+    def add_pending(self, address: str):
+        if address not in self._pendings:
+            pending = PendingEntry(address)
+            self._pendings.update({address: pending})
+
+    def remove_pending(self, address: str):
+        if address in self._pendings:
+            del self._pendings[address]
+
+    def has_pending(self, address):
+        return address in self._pendings
+
+
 class PacketSender(EventListener):
-    def __init__(self, iface, data: Data):
+    def __init__(self, iface, data: Data, pendings: PendingSolicitations):
         self.iface = iface
         self._data = data
+        self._pendings = pendings
 
     def _packet_send(self, packet: str):
         values = packet.split(";")
@@ -102,6 +126,7 @@ class PacketSender(EventListener):
         ip.dst = "ff02::1"
         icmp = ICMPv6ND_NS()
         icmp.tgt = str(ip_addr)
+        self._pendings.add_pending(str(ip_addr))
         send(ip / icmp)
         logging.debug('BRIDGE:sending neighbour solicitation for target ip "{}"'.format(ip_addr))
 

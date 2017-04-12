@@ -1,10 +1,10 @@
 from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPacketToSendEvent, SlipCommands, \
-    InputParser, SettingMoteGlobalAddressEvent, ChangeModeEvent
+    InputParser, SettingMoteGlobalAddressEvent
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender, \
-    MoteNeighbourSolicitationEvent
+    MoteNeighbourSolicitationEvent, PendingSolicitations
 from utils.configuration_loader import ConfigurationLoader
-from data import Data, NodeTable, NewNodeEvent, IpConfigurator
+from data import Data, NodeTable, NewNodeEvent, IpConfigurator, ChangeModeEvent
 import configparser
 import os
 import logging
@@ -30,6 +30,7 @@ class Boot(object):
         self._data = Data(self.configLoader.read_configuration(
             "{0}/configuration/configuration.conf".format(self._pwd)))
         self._node_table = NodeTable(self._tech_types)
+        self._pending_solicitations = PendingSolicitations()
         self._slip_sender = SlipSender(self._data.get_configuration()['serial']['device'])
         self._input_parser = InputParser(self._data, self._node_table)
         self._slip_listener = SlipListener(self._data.get_configuration()['serial']['device'], self._data,
@@ -37,7 +38,7 @@ class Boot(object):
         self._packet_parser = Ipv6PacketParser(self._data)
         self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'], self._packet_parser)
         self._slip_commands = SlipCommands(self._slip_sender, self._data)
-        self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data)
+        self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data, self._pending_solicitations)
         self._neighbour_request_timer = NeighbourRequestTimer(10, self._slip_commands)
         self._ip_configurator = IpConfigurator(self._data, self._data.get_configuration()['wifi']['device'],
                                                self._data.get_configuration()['wifi']['subnet'],
@@ -52,7 +53,7 @@ class Boot(object):
         self._node_table.subscribe_event(NewNodeEvent, self._packed_sender)
         self._packet_parser.subscribe_event(MoteNeighbourSolicitationEvent, self._packed_sender)
         self._input_parser.subscribe_event(SettingMoteGlobalAddressEvent, self._ip_configurator)
-        self._input_parser.subscribe_event(ChangeModeEvent, self._ip_configurator)
+        self._data.subscribe_event(ChangeModeEvent, self._ip_configurator)
 
     def run(self):
         try:
@@ -60,6 +61,7 @@ class Boot(object):
         except:
             print("Error: unable to start thread")
 
+        self._data.set_mode(Data.MODE_NODE)
         self._slip_commands.request_config_from_contiki()
         self._slip_commands.send_config_to_contiki()
         # todo create mechanism which handles fact, that while init boot is not complete -> other listeners must wait

@@ -30,14 +30,6 @@ class SettingMoteGlobalAddressEvent(Event):
         return "setting-mote-global-address-event"
 
 
-class ChangeModeEvent(Event):
-    def __init__(self, data: int):
-        Event.__init__(self, data)
-
-    def __str__(self):
-        return "change-mode-event"
-
-
 class InputParser(EventProducer):
     def __init__(self, data: Data, node_table: NodeTable):
         EventProducer.__init__(self)
@@ -46,7 +38,6 @@ class InputParser(EventProducer):
         self.add_event_support(ContikiBootEvent)
         self.add_event_support(SlipPacketToSendEvent)
         self.add_event_support(SettingMoteGlobalAddressEvent)
-        self.add_event_support(ChangeModeEvent)
 
     def parse(self, line):
         if line[:2] == b'!r':
@@ -69,7 +60,7 @@ class InputParser(EventProducer):
             self.notify_listeners(ContikiBootEvent(line))
             logging.info('BRIDGE:contiki is rebooting')
         elif line[:2] == b'!c':
-            self.notify_listeners(ChangeModeEvent(int(line[2:-1])))
+            self._data.set_mode(int(line[2:-1]))
             logging.info('BRIDGE:bridge runs in mode {}'.format(line[2:-1]))
         elif line[:2] == b'!n':
             line = line.decode("utf-8")

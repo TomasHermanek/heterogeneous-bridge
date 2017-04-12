@@ -5,11 +5,21 @@ import os
 from ipaddress import IPv6Address, IPv6Network, AddressValueError
 
 
-class Data:
+class ChangeModeEvent(Event):
+    def __init__(self, data: int):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "change-mode-event"
+
+
+class Data(EventProducer):
     MODE_ROOT = 1
     MODE_NODE = 2
 
     def __init__(self, configuration):
+        EventProducer.__init__(self)
+        self.add_event_support(ChangeModeEvent)
         self._mote_global_address = None
         self._mote_link_local_address = None
         self._wifi_global_address = None
@@ -19,6 +29,7 @@ class Data:
     def set_mode(self, mode: int):
         if mode == self.MODE_NODE or mode == self.MODE_ROOT:
             self._mode = mode
+            self.notify_listeners(ChangeModeEvent(mode))
 
     def set_wifi_global_address(self, global_address):
         self._wifi_global_address = global_address
@@ -51,7 +62,7 @@ class IpConfigurator(EventListener):
 
     def _unset_address(self, address: str):
         logging.debug('BRIDGE:removing address "{}" from "{}" interface'.format(address, self._iface))
-        os.system("ifconfig {} del {}/{}".format(self._iface, address, self._prefix.prefixlen))
+        os.system("ifconfig {} del {}".format(self._iface, address))
 
     def _set_address(self, address: str):
         logging.debug('BRIDGE:adding address "{}" to "{}" interface'.format(address, self._iface))
@@ -70,7 +81,7 @@ class IpConfigurator(EventListener):
             try:
                 addr_obj = IPv6Address(address['addr'])
                 if addr_obj in self._prefix:
-                    self._unset_address(str(addr_obj))
+                    self._unset_address("{}/{}".format(str(addr_obj), self._prefix.prefixlen))
             except AddressValueError:
                 logging.warning('BRIDGE:interface "{}" has not valid ipv6 address "{}"'.format(self._iface, address))
 
@@ -83,7 +94,7 @@ class IpConfigurator(EventListener):
         self._data.set_wifi_global_address(wifi_global_address.split("/")[0])
 
     def notify(self, event: Event):
-        from serial_connection import SettingMoteGlobalAddressEvent, ChangeModeEvent
+        from serial_connection import SettingMoteGlobalAddressEvent
         if isinstance(event, SettingMoteGlobalAddressEvent):
             self.set_wifi_ipv6_lobal_address(event.get_event())
         elif isinstance(event, ChangeModeEvent):
