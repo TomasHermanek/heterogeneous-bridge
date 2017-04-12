@@ -22,6 +22,14 @@ class SlipPacketToSendEvent(Event):
         return "slip-packet-to-send-event"
 
 
+class SettingMoteGlobalAddressEvent(Event):
+    def __init__(self, data: str):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "setting-mote-global-address-event"
+
+
 class InputParser(EventProducer):
     def __init__(self, data: Data, node_table: NodeTable):
         EventProducer.__init__(self)
@@ -29,6 +37,7 @@ class InputParser(EventProducer):
         self._node_table = node_table
         self.add_event_support(ContikiBootEvent)
         self.add_event_support(SlipPacketToSendEvent)
+        self.add_event_support(SettingMoteGlobalAddressEvent)
 
     def parse(self, line):
         if line[:2] == b'!r':
@@ -38,10 +47,11 @@ class InputParser(EventProducer):
                 if address != "":
                     ipadress_obj = ipaddress.ip_address(address)
                     if ipadress_obj.is_global:
-                        self._data.set_global_address(address)
+                        self._data.set_mote_global_address(address)
+                        self.notify_listeners(SettingMoteGlobalAddressEvent(address))
                         logging.info('BRIDGE:contiki uses global IPv6 address "{}"'.format(address))
                     elif ipadress_obj.is_link_local:
-                        self._data.set_link_local_address(address)
+                        self._data.set_mote_link_local_address(address)
                         logging.info('BRIDGE:contiki uses link local IPv6 address "{}"'.format(address))
         elif line[:2] == b'!p':
             self.notify_listeners(SlipPacketToSendEvent(line))

@@ -1,25 +1,84 @@
-from ipaddress import IPv6Address
-from event_system import EventProducer, Event
+from event_system import EventProducer, Event, EventListener
 import logging
+import netifaces
+import os
+from ipaddress import IPv6Address, IPv6Network, AddressValueError
+
+
+class IpConfigurator(EventListener):
+    def __init__(self, iface: str, prefix: str):
+        self._iface = iface
+        self._prefix = IPv6Network(prefix)
+
+    def _unset_address(self, address: str):
+        logging.debug('BRIDGE:removing address "{}" from "{}" interface'.format(address, self._iface))
+        os.system("ifconfig {} del {}/{}".format(self._iface, address, self._prefix.prefixlen))
+
+    def _set_address(self, address: str):
+        logging.debug('BRIDGE:adding address "{}" to "{}" interface'.format(address, self._iface))
+        os.system("ifconfig {} add {}".format(self._iface, address))
+
+    def _get_wifi_global_address(self):
+        interface = netifaces.ifaddresses(self._iface)
+        try:
+            return interface[netifaces.AF_INET6]
+        except KeyError:
+            logging.debug('BRIDGE:previous ipv6 address not configured for "{}" interface'.format(self._iface))
+        return []
+
+    def _remove_current_addresses_from_prefix(self, current_addresses: list):
+        for address in current_addresses:
+            try:
+                addr_obj = IPv6Address(address['addr'])
+                if addr_obj in self._prefix:
+                    self._unset_address(str(addr_obj))
+            except AddressValueError:
+                logging.warning('BRIDGE:interface "{}" has not valid ipv6 address "{}"'.format(self._iface, address))
+
+    def remove_root_address(self, root_address: str):
+        pass #todo implement remove configured border router address
+
+    def set_wifi_ipv6_lobal_address(self, mote_global_address: str):        # todo check if address to remove and address to add is not same
+        current_addresses = self._get_wifi_global_address()
+        self._remove_current_addresses_from_prefix(current_addresses)
+        last_ocet = mote_global_address.split(":")[-1]
+        wifi_global_address = str(self._prefix).replace("::", "::{}".format(last_ocet))
+        self._set_address(wifi_global_address)
+        return
+
+    def notify(self, event: Event):
+        from serial_connection import SettingMoteGlobalAddressEvent
+        if isinstance(event, SettingMoteGlobalAddressEvent):
+            self.set_wifi_ipv6_lobal_address(event.get_event())
+
+    def __str__(self):
+        return "ip-configurator"
 
 
 class Data:
     def __init__(self, configuration):
-        self._global_address = None
-        self._link_local_address = None
+        self._mote_global_address = None
+        self._mote_link_local_address = None
+        self._wifi_global_address = None
         self._configuration = configuration
 
-    def set_global_address(self, global_address):
-        self._global_address = global_address
+    def set_wifi_global_address(self, global_address):
+        self._wifi_global_address = global_address
 
-    def get_global_address(self):
-        return self._global_address
+    def get_wifi_global_address(self):
+        return self._wifi_global_address
 
-    def set_link_local_address(self, link_local_address):
-        self._link_local_address = link_local_address
+    def set_mote_global_address(self, global_address):
+        self._mote_global_address = global_address
 
-    def get_link_local_address(self):
-        return self._link_local_address
+    def get_mote_global_address(self):
+        return self._mote_global_address
+
+    def set_mote_link_local_address(self, link_local_address):
+        self._mote_link_local_address = link_local_address
+
+    def get_mote_link_local_address(self):
+        return self._mote_link_local_address
 
     def get_configuration(self):
         return self._configuration

@@ -23,6 +23,7 @@ class ConfigurationLoader:
                 read_config[section]['device'] = self.confParser[section]['device']
             elif section == 'wifi':
                 read_config[section]['device'] = self.confParser[section]['device']
+                read_config[section]['subnet'] = self.confParser[section]['subnet']
             elif section == 'metrics':
                 read_config[section]['en'] = self.confParser[section]['en']
                 read_config[section]['bw'] = self.confParser[section]['bw']

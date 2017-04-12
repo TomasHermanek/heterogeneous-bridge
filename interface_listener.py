@@ -41,7 +41,7 @@ class Ipv6PacketParser(EventProducer):
     def _parse_udp(self, packet: Ether):
         ip = packet[IPv6]
         # print("comparing {} vs {}".format(ip[1].dst, self._data.get_src_ip()))
-        if IPv6 in ip and ip[1].dst == self._data.get_global_address():
+        if IPv6 in ip and ip[1].dst == self._data.get_mote_global_address():
             # print("target is my mote")
             udp = packet[UDP]
             raw = packet[Raw]
@@ -55,7 +55,7 @@ class Ipv6PacketParser(EventProducer):
         target_ip = packet[ICMPv6ND_NS].tgt
         src_ip = packet[IPv6].src
 
-        if str(self._data.get_global_address()) == target_ip or str(self._data.get_link_local_address()) == target_ip:
+        if str(self._data.get_mote_global_address()) == target_ip or str(self._data.get_mote_link_local_address()) == target_ip:
             logging.warning('BRIDGE:Sending response to ICMPv6 neighbour solicitation for address "{}"'
                             .format(target_ip))
             self.notify_listeners(MoteNeighbourSolicitationEvent({
@@ -64,7 +64,7 @@ class Ipv6PacketParser(EventProducer):
             }))
 
     def parse(self, packet: Ether):
-        if not self._data.get_global_address():
+        if not self._data.get_mote_global_address():
             logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not compare incoming packet')
             return
         if UDP in packet:
@@ -86,7 +86,7 @@ class PacketSender(EventListener):
         ip_w = IPv6()
         ip_w.dst = self._data.get_configuration()['border-router']['ipv6']
         ip_r = IPv6()
-        ip_r.src = self._data.get_global_address()
+        ip_r.src = self._data.get_mote_global_address()
         ip_r.dst = values[0]
         udp = UDP()
         udp.sport = int(values[1])
@@ -111,7 +111,7 @@ class PacketSender(EventListener):
 
     def notify(self, event: Event):
         if isinstance(event, SlipPacketToSendEvent):
-            if not self._data.get_global_address():
+            if not self._data.get_mote_global_address():
                 logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
                 return
 
