@@ -1,7 +1,7 @@
 from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPacketToSendEvent, SlipCommands, \
     InputParser
 from timers import NeighbourRequestTimer, PurgeTimer
-from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent
+from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender
 from utils.configuration_loader import ConfigurationLoader
 from data import Data, NodeTable, NewNodeEvent
 import configparser
@@ -35,18 +35,18 @@ class Boot(object):
         self._slip_listener = SlipListener(self._data.get_configuration()['serial']['device'], self._data,
                                            self._input_parser)
         self._packet_parser = Ipv6PacketParser(self._data)
-        self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'],
-                                                     self._packet_parser, self._data)
+        self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'], self._packet_parser)
         self._slip_commands = SlipCommands(self._slip_sender, self._data)
+        self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data)
         self._neighbour_request_timer = NeighbourRequestTimer(10, self._slip_commands)
         self._purge_timer = PurgeTimer(1, self._node_table)
 
     def _boot_event_subscribers(self):
-        self._slip_listener.get_input_parser().subscribe_event(ContikiBootEvent, self._slip_commands)
-        self._slip_listener.get_input_parser().subscribe_event(SlipPacketToSendEvent, self._interface_listener)
+        self._input_parser.subscribe_event(ContikiBootEvent, self._slip_commands)
+        self._input_parser.subscribe_event(SlipPacketToSendEvent, self._packed_sender)
         self._interface_listener.get_ipv6_packet_parser().subscribe_event(IncomingPacketSendToSlipEvent,
                                                                           self._slip_commands)
-        self._node_table.subscribe_event(NewNodeEvent, self._interface_listener)
+        self._node_table.subscribe_event(NewNodeEvent, self._packed_sender)
 
     def run(self):
         try:

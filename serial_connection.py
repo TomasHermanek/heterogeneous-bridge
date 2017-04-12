@@ -44,7 +44,6 @@ class InputParser(EventProducer):
                         self._data.set_link_local_address(address)
                         logging.info('BRIDGE:contiki uses link local IPv6 address "{}"'.format(address))
         elif line[:2] == b'!p':
-            print(line)
             self.notify_listeners(SlipPacketToSendEvent(line))
             logging.debug('BRIDGE:incoming packet to send')
         elif line[:2] == b'!b':

@@ -52,11 +52,55 @@ class Ipv6PacketParser(EventProducer):
                 logging.error('BRIDGE:{}'.format(str(e)))
 
 
-class InterfaceListener(Thread, EventListener):
-    def __init__(self, iface, packet_parser: Ipv6PacketParser, data: Data):
-        Thread.__init__(self)
+class PacketSender(EventListener):
+    def __init__(self, iface, data: Data):
         self.iface = iface
         self._data = data
+
+    def _packet_send(self, packet: str):
+        values = packet.split(";")
+        ip_w = IPv6()
+        ip_w.dst = self._data.get_configuration()['border-router']['ipv6']
+        ip_r = IPv6()
+        ip_r.src = self._data.get_global_address()
+        ip_r.dst = values[0]
+        udp = UDP()
+        udp.sport = int(values[1])
+        udp.dport = int(values[2])
+        send(ip_w / ip_r / udp / values[3])
+        logging.debug('BRIDGE:sending packet using "{}"'.format(self.iface))
+
+    def _send_icmpv6_ns(self, ip_addr: ipaddress.IPv6Address):
+        ip = IPv6()
+        ip.dst = "ff02::1"
+        icmp = ICMPv6ND_NS()
+        icmp.tgt = str(ip_addr)
+        send(ip / icmp)
+        logging.debug('BRIDGE:sending neighbour solicitation for target ip "{}"'
+                      .format(ip_addr))
+
+    def notify(self, event: Event):
+        if isinstance(event, SlipPacketToSendEvent):
+            if not self._data.get_global_address():
+                logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
+                return
+
+            packet_to_send = event.get_event()
+            packet_to_send_decoded = packet_to_send[2:-1].decode("utf-8")
+            self._packet_send(packet_to_send_decoded)
+
+        elif isinstance(event, NewNodeEvent):
+            self._send_icmpv6_ns(event.get_event().get_ip_address())
+
+
+    def __str__(self):
+        return "packet-sender"
+
+
+class InterfaceListener(Thread):
+    def __init__(self, iface, packet_parser: Ipv6PacketParser):
+        Thread.__init__(self)
+        self.iface = iface
         self._packetParser = packet_parser
 
     def get_ipv6_packet_parser(self):
@@ -73,40 +117,3 @@ class InterfaceListener(Thread, EventListener):
             if info[2] != socket.PACKET_OUTGOING:
                 if IPv6 in ether_packet:
                     self._packetParser.parse(ether_packet)
-
-    # todo make new class which will be responsible for packet send
-    def notify(self, event: Event):     # todo refactor, move packet creation to another service
-        if isinstance(event, SlipPacketToSendEvent):
-            if not self._data.get_global_address():
-                logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
-                return
-
-            packet_to_send = event.get_event()
-            print("sending packet: {}".format(packet_to_send))
-
-            packet_to_send_decoded = packet_to_send[2:-1].decode("utf-8")
-            values = packet_to_send_decoded.split(";")
-            print(values)
-
-            ip_w = IPv6()
-            ip_w.dst = self._data.get_configuration()['border-router']['ipv6']
-            ip_r = IPv6()
-            ip_r.src = self._data.get_global_address()
-            ip_r.dst = values[0]
-            udp = UDP()
-            udp.sport = int(values[1])
-            udp.dport = int(values[2])
-            send(ip_w/ip_r/udp/values[3])
-            logging.debug('BRIDGE:sending packet using "{}"'.format(self.iface))
-
-        elif isinstance(event, NewNodeEvent):
-            ip = IPv6()
-            ip.dst = "ff02::1"
-            icmp = ICMPv6ND_NS()
-            icmp.tgt = str(event.get_event().get_ip_address())
-            send(ip/icmp)
-            logging.debug('BRIDGE:sending neighbour solicitation for target ip "{}"'
-                          .format(event.get_event().get_ip_address()))
-
-    def __str__(self):
-        return "interface-listener"
