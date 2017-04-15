@@ -2,9 +2,11 @@ from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPa
     InputParser, SettingMoteGlobalAddressEvent
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender, \
-    MoteNeighbourSolicitationEvent, PendingSolicitations
+    MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent
+from neighbors import PendingSolicitations, NewNodeEvent, NodeTable
 from utils.configuration_loader import ConfigurationLoader
-from data import Data, NodeTable, NewNodeEvent, IpConfigurator, ChangeModeEvent
+from data import Data, IpConfigurator, ChangeModeEvent
+from neighbors import NeighborManager
 import configparser
 import os
 import logging
@@ -38,7 +40,8 @@ class Boot(object):
         self._packet_parser = Ipv6PacketParser(self._data)
         self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'], self._packet_parser)
         self._slip_commands = SlipCommands(self._slip_sender, self._data)
-        self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data, self._pending_solicitations)
+        self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data)
+        self._neighbour_manager = NeighborManager(self._node_table, self._data, self._pending_solicitations, self._packed_sender)
         self._neighbour_request_timer = NeighbourRequestTimer(10, self._slip_commands)
         self._ip_configurator = IpConfigurator(self._data, self._data.get_configuration()['wifi']['device'],
                                                self._data.get_configuration()['wifi']['subnet'],
@@ -50,8 +53,9 @@ class Boot(object):
         self._input_parser.subscribe_event(SlipPacketToSendEvent, self._packed_sender)
         self._interface_listener.get_ipv6_packet_parser().subscribe_event(IncomingPacketSendToSlipEvent,
                                                                           self._slip_commands)
-        self._node_table.subscribe_event(NewNodeEvent, self._packed_sender)
-        self._packet_parser.subscribe_event(MoteNeighbourSolicitationEvent, self._packed_sender)
+        self._node_table.subscribe_event(NewNodeEvent, self._neighbour_manager)
+        self._packet_parser.subscribe_event(MoteNeighbourSolicitationEvent, self._neighbour_manager)
+        self._packet_parser.subscribe_event(NeighbourAdvertisementEvent, self._neighbour_manager)
         self._input_parser.subscribe_event(SettingMoteGlobalAddressEvent, self._ip_configurator)
         self._data.subscribe_event(ChangeModeEvent, self._ip_configurator)
 

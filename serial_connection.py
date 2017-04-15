@@ -1,5 +1,6 @@
 from threading import Thread
-from data import Data, NodeAddress, NodeTable
+from data import Data
+from neighbors import NodeAddress, NodeTable
 from event_system import EventProducer, Event, EventListener
 import logging
 import serial

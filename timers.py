@@ -1,6 +1,6 @@
 from threading import Thread
 from serial_connection import SlipCommands
-from data import NodeTable
+from neighbors import NodeTable
 import time
 
 
@@ -26,5 +26,5 @@ class PurgeTimer(Thread):
     def run(self):
         while 1:
             self._node_table.decrease_lifetime()
-            print(self._node_table)
+            # print(self._node_table)
             time.sleep(self._purging_interval)

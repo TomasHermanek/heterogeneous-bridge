@@ -1,0 +1,203 @@
+import logging
+from ipaddress import IPv6Address
+
+from interface_listener import PacketSender, MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent
+from threading import Thread
+from event_system import EventListener, Event, EventProducer
+from data import Data
+import time
+
+
+class NodeAddress:
+    _reset_lifetime = 255
+
+    def __init__(self, ip_address: IPv6Address, tech_type):
+        self._ip_address = ip_address
+        self._lifetime = self._reset_lifetime
+        self._type = tech_type
+        self._next_address = {}
+
+    def get_ip_address(self) -> IPv6Address:
+        return self._ip_address
+
+    def get_tech_type(self) -> str:
+        return self._type
+
+    def get_lifetime(self) -> int:
+        return self._lifetime
+
+    def reset_lifetime(self):
+        self._lifetime = self._reset_lifetime
+
+    def decrease_lifetime(self):
+        self._lifetime -= 1
+
+    def add_next_node_address(self, node_address):
+        if str(node_address.get_ip_address()) not in self._next_address:
+            self._next_address.update({
+                str(node_address.get_ip_address()): node_address
+            })
+            node_address.add_next_node_address(self)
+
+    def remove_next_node_address(self, node_address):
+        if str(node_address.get_ip_address()) in self._next_address:
+            del self._next_address[str(node_address.get_ip_address())]
+            node_address.remove_next_node_address(self)
+
+    def get_node_addresses(self):
+        return self._next_address
+
+    def __str__(self):
+        return "IP address: {}, lifetime: {}, next_nodes [{}]".format(str(self._ip_address), self._lifetime, "".join(
+            ["{}-{};".format(str(value.get_ip_address()), value.get_tech_type()) for (key, value) in self._next_address.items()]
+        ))
+
+
+class NewNodeEvent(Event):
+    def __init__(self, data: NodeAddress):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "new-node-event"
+
+
+class NodeTable(EventProducer):
+    def __init__(self, types: list):
+        EventProducer.__init__(self)
+        self.add_event_support(NewNodeEvent)
+        self._nodes = {}
+        self._types = types
+        for tech_type in types:
+            self._nodes.update({
+                tech_type: {}
+            })
+
+    def get_node_address(self, address: str, type: str):
+        if address in self._nodes[type]:
+            return self._nodes[type][address]
+        return None
+
+    def add_node_address(self, node_address: NodeAddress):
+        if str(node_address.get_ip_address()) not in self._nodes[node_address.get_tech_type()]:
+            self._nodes[node_address.get_tech_type()].update({
+                str(node_address.get_ip_address()): node_address
+            })
+            logging.debug('BRIDGE:added new node address "{}"'.format(node_address))
+            self.notify_listeners(NewNodeEvent(node_address))
+        else:
+            self._nodes[node_address.get_tech_type()][str(node_address.get_ip_address())].reset_lifetime()
+            logging.debug('BRIDGE:refreshed node lifetime "{}"'.format(node_address))
+
+    def remove_node_address_record(self, node_address: NodeAddress):
+        if str(node_address.get_ip_address()) in self._nodes[node_address.get_tech_type()]:
+            next_node_addresses = self._nodes[node_address.get_tech_type()][str(node_address.get_ip_address())].get_node_addresses()
+            for next_node_address in next_node_addresses:
+                next_node_address.remove_next_node_address(node_address)
+            del self._nodes[node_address.get_tech_type()][str(node_address.get_ip_address())]
+
+    def decrease_lifetime(self):
+        for tech_type in self._types:
+            for node_key in list(self._nodes[tech_type]):
+                node = self._nodes[tech_type][node_key]
+                node.decrease_lifetime()
+                if node.get_lifetime() <= 0:
+                    self.remove_node_address_record(node)
+
+    def __str__(self):
+        result = ""
+        for tech_type in self._types:
+            result += "tech {}: \n{}\n".format(tech_type, "\n".join(
+                ["{}".format(value) for (key, value) in self._nodes[tech_type].items()]
+            ))
+        return result
+
+
+class PendingEntry(Thread):
+    MAX_ATTEMPTS = 4
+    ATTEMPT_DELAY_MULTIPLICATION = 5
+
+    def __init__(self, address: str, sender_function):
+        Thread.__init__(self)
+        self._address = address
+        self._sender_function = sender_function
+        self._attempt = 0
+
+    def inc_attempt(self):
+        self._attempt += 1
+
+    def get_attempt(self):
+        return self._attempt
+
+    def run(self):
+        while self._attempt <= PendingEntry.MAX_ATTEMPTS:
+            self._sender_function(self._address)
+            self.inc_attempt()
+            time.sleep(self._attempt * PendingEntry.ATTEMPT_DELAY_MULTIPLICATION)
+
+    def finish(self):
+        self._attempt = PendingEntry.MAX_ATTEMPTS + 1
+
+    def __str__(self):
+        return "IP: {} attempt: {}".format(self._address, self._attempt)
+
+
+class PendingSolicitations:
+    def __init__(self):
+        self._pendings = {}
+
+    def add_pending(self, address: str, sender_function):
+        if address not in self._pendings:
+            pending = PendingEntry(address, sender_function)
+            self._pendings.update({address: pending})
+            pending.start()
+
+    def remove_pending(self, address: str):
+        if address in self._pendings:
+            self._pendings[address].finish()
+            del self._pendings[address]
+
+    def has_pending(self, address: str):
+        return address in self._pendings
+
+    def inc_pending(self, address: str):
+        if address in self._pendings:
+            self._pendings[address].inc_attempt()
+
+    def __str__(self):
+        return "".join(["{}\n".format(value) for (key, value) in self._pendings.items()])
+
+
+class NeighborManager(EventListener):
+    def __init__(self, node_table: NodeTable, data: Data, pendings: PendingSolicitations, packet_sender: PacketSender):
+        EventListener.__init__(self)
+        self._pendings = pendings
+        self._sender = packet_sender
+        self._data = data
+        self._node_table = node_table
+
+    def notify(self, event: Event):
+        if isinstance(event, MoteNeighbourSolicitationEvent):
+            self._sender.send_icmpv6_na(src_ip=event.get_event()["src_ip"], target_ip=event.get_event()["target_ip"])
+
+        elif isinstance(event, NewNodeEvent):
+            new_ip = str(event.get_event().get_ip_address())
+            self._pendings.add_pending(new_ip, self._sender.send_icmpv6_ns)
+
+        elif isinstance(event, NeighbourAdvertisementEvent):
+            src_ip = event.get_event()["src_ip"]
+            target_ip = event.get_event()["target_ip"]
+            if self._pendings.has_pending(target_ip):
+                self._pendings.remove_pending(target_ip)
+
+                wifi_node_address = self._node_table.get_node_address(src_ip, 'wifi')
+                if not wifi_node_address:
+                    wifi_node_address = NodeAddress(src_ip, 'wifi')
+                self._node_table.add_node_address(wifi_node_address)
+
+                mote_node_address = self._node_table.get_node_address(target_ip, 'rpl')
+                if mote_node_address:
+                    mote_node_address.add_next_node_address(wifi_node_address)
+                print("{}".format(self._node_table))
+
+    def __str__(self):
+        return 'neighbor-manager'
