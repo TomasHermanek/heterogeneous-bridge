@@ -95,7 +95,7 @@ class PacketSender(EventListener):
         self.iface = iface
         self._data = data
 
-    def _packet_send(self, packet: str):
+    def _packet_send_to_root(self, packet: str):
         values = packet.split(";")
         ip_w = IPv6()
         ip_w.src = self._data.get_wifi_global_address()
@@ -136,7 +136,7 @@ class PacketSender(EventListener):
 
             packet_to_send = event.get_event()
             packet_to_send_decoded = packet_to_send[2:-1].decode("utf-8")
-            self._packet_send(packet_to_send_decoded)
+            self._packet_send_to_root(packet_to_send_decoded)
 
     def __str__(self):
         return "packet-sender"

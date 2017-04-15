@@ -31,6 +31,14 @@ class SettingMoteGlobalAddressEvent(Event):
         return "setting-mote-global-address-event"
 
 
+class RequestRouteToMoteEvent(Event):
+    def __init__(self, data: dict):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "request-route-to-mote-event"
+
+
 class InputParser(EventProducer):
     def __init__(self, data: Data, node_table: NodeTable):
         EventProducer.__init__(self)
@@ -39,6 +47,7 @@ class InputParser(EventProducer):
         self.add_event_support(ContikiBootEvent)
         self.add_event_support(SlipPacketToSendEvent)
         self.add_event_support(SettingMoteGlobalAddressEvent)
+        self.add_event_support(RequestRouteToMoteEvent)
 
     def parse(self, line):
         if line[:2] == b'!r':
@@ -54,6 +63,14 @@ class InputParser(EventProducer):
                     elif ipadress_obj.is_link_local:
                         self._data.set_mote_link_local_address(address)
                         logging.info('BRIDGE:contiki uses link local IPv6 address "{}"'.format(address))
+        elif line[:2] == b'?p':
+            line = line.decode("utf-8")
+            (question_id, ip_addr) = line[3:-1].split(";")
+            self.notify_listeners(RequestRouteToMoteEvent({
+                "question_id": question_id,
+                "ip_addr": ip_addr
+            }))
+            logging.debug('BRIDGE:contiki needs wants to use wifi for target host "{}"'.format(ip_addr))
         elif line[:2] == b'!p':
             self.notify_listeners(SlipPacketToSendEvent(line))
             logging.debug('BRIDGE:incoming packet to send')
@@ -117,6 +134,11 @@ class SlipCommands(EventListener):
         cmd = "!we{}b{}x{}\n".format(metrics['en'], metrics['bw'], metrics['etx'])
         self._slip_sender.send(str.encode(cmd))
         logging.info('BRIDGE:sending config "{}" to contiki'.format(cmd))
+
+    def send_route_request_response_to_contiki(self, question_id: int, response: int):
+        cmd = "$p;{};{}".format(question_id, response)
+        self._slip_sender.send(str.encode(cmd))
+        logging.info('BRIDGE:sending response to route request "{}"'.format(cmd))
 
     def request_config_from_contiki(self):
         self._slip_sender.send(b'?c\n')

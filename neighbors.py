@@ -1,6 +1,5 @@
 import logging
 from ipaddress import IPv6Address
-
 from interface_listener import PacketSender, MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent
 from threading import Thread
 from event_system import EventListener, Event, EventProducer
@@ -19,6 +18,12 @@ class NodeAddress:
 
     def get_ip_address(self) -> IPv6Address:
         return self._ip_address
+
+    def has_neighbor_with_tech(self, tech_type: str):
+        for next_address in self._next_address:
+            if next_address.get_tech_type() == tech_type:
+                return True
+        return False
 
     def get_tech_type(self) -> str:
         return self._type
@@ -71,6 +76,12 @@ class NodeTable(EventProducer):
             self._nodes.update({
                 tech_type: {}
             })
+
+    def has_node(self, address: str):
+        for node_type in self._types:
+            if address in self._nodes[node_type]:
+                return True
+        return False
 
     def get_node_address(self, address: str, type: str):
         if address in self._nodes[type]:
@@ -168,14 +179,17 @@ class PendingSolicitations:
 
 
 class NeighborManager(EventListener):
-    def __init__(self, node_table: NodeTable, data: Data, pendings: PendingSolicitations, packet_sender: PacketSender):
+    def __init__(self, node_table: NodeTable, data: Data, pendings: PendingSolicitations, packet_sender: PacketSender,
+                 slip_commands):
         EventListener.__init__(self)
         self._pendings = pendings
         self._sender = packet_sender
         self._data = data
         self._node_table = node_table
+        self._slip_commands = slip_commands
 
     def notify(self, event: Event):
+        from serial_connection import RequestRouteToMoteEvent
         if isinstance(event, MoteNeighbourSolicitationEvent):
             self._sender.send_icmpv6_na(src_ip=event.get_event()["src_ip"], target_ip=event.get_event()["target_ip"])
 
@@ -198,6 +212,13 @@ class NeighborManager(EventListener):
                 if mote_node_address:
                     mote_node_address.add_next_node_address(wifi_node_address)
                 print("{}".format(self._node_table))
+        elif isinstance(event, RequestRouteToMoteEvent):
+            node = self._node_table.get_node_address(event.get_event()["ip_addr"], 'rpl')
+            if node and node.has_neighbor_with_tech('wifi'):
+                response = 1
+            else:
+                response = 0
+            self._slip_commands.send_route_request_response_to_contiki(event.get_event()["question_id"], response)
 
     def __str__(self):
         return 'neighbor-manager'

@@ -1,5 +1,5 @@
 from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPacketToSendEvent, SlipCommands, \
-    InputParser, SettingMoteGlobalAddressEvent
+    InputParser, SettingMoteGlobalAddressEvent, RequestRouteToMoteEvent
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender, \
     MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent
@@ -41,7 +41,7 @@ class Boot(object):
         self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'], self._packet_parser)
         self._slip_commands = SlipCommands(self._slip_sender, self._data)
         self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data)
-        self._neighbour_manager = NeighborManager(self._node_table, self._data, self._pending_solicitations, self._packed_sender)
+        self._neighbour_manager = NeighborManager(self._node_table, self._data, self._pending_solicitations, self._packed_sender, self._slip_commands)
         self._neighbour_request_timer = NeighbourRequestTimer(10, self._slip_commands)
         self._ip_configurator = IpConfigurator(self._data, self._data.get_configuration()['wifi']['device'],
                                                self._data.get_configuration()['wifi']['subnet'],
@@ -57,6 +57,7 @@ class Boot(object):
         self._packet_parser.subscribe_event(MoteNeighbourSolicitationEvent, self._neighbour_manager)
         self._packet_parser.subscribe_event(NeighbourAdvertisementEvent, self._neighbour_manager)
         self._input_parser.subscribe_event(SettingMoteGlobalAddressEvent, self._ip_configurator)
+        self._input_parser.subscribe_event(RequestRouteToMoteEvent, self._neighbour_manager)
         self._data.subscribe_event(ChangeModeEvent, self._ip_configurator)
 
     def run(self):
