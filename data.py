@@ -23,11 +23,11 @@ class Data(EventProducer):
         self._mote_global_address = None
         self._mote_link_local_address = None
         self._wifi_global_address = None
-        self._mode = self.MODE_NODE
+        self._mode = None
         self._configuration = configuration
 
     def set_mode(self, mode: int):
-        if mode == self.MODE_NODE or mode == self.MODE_ROOT:
+        if (mode == self.MODE_NODE or mode == self.MODE_ROOT) and mode != self._mode:
             self._mode = mode
             self.notify_listeners(ChangeModeEvent(mode))
 
@@ -90,8 +90,9 @@ class IpConfigurator(EventListener):
         self._remove_current_addresses_from_prefix(current_addresses)
         last_ocet = mote_global_address.split(":")[-1]
         wifi_global_address = str(self._prefix).replace("::", "::{}".format(last_ocet))
-        self._set_address(wifi_global_address)
-        self._data.set_wifi_global_address(wifi_global_address.split("/")[0])
+        if wifi_global_address != self._data.get_wifi_global_address():
+            self._set_address(wifi_global_address)
+            self._data.set_wifi_global_address(wifi_global_address.split("/")[0])
 
     def notify(self, event: Event):
         from serial_connection import SettingMoteGlobalAddressEvent
