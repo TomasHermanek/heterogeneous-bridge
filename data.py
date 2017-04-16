@@ -53,6 +53,11 @@ class Data(EventProducer):
     def get_configuration(self):
         return self._configuration
 
+    def print_data(self):
+        print('Bridge mode: {}\nMote global IP: {:>30}\nMote local IP: {:>30}\nWifi global IP: {:>30}\n'.
+              format("ROOT" if self._mode == self.MODE_ROOT else "NODE", self._mote_global_address,
+                     self._mote_link_local_address, self._wifi_global_address))
+
 
 class IpConfigurator(EventListener):
     def __init__(self, data: Data, iface: str, prefix: str, root_address: str):

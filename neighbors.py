@@ -53,8 +53,8 @@ class NodeAddress:
         return self._next_address
 
     def __str__(self):
-        return "IP address: {}, lifetime: {}, next_nodes [{}]".format(str(self._ip_address), self._lifetime, "".join(
-            ["{}-{};".format(str(value.get_ip_address()), value.get_tech_type()) for (key, value) in self._next_address.items()]
+        return "{:<30}{:<10}[{}]".format(str(self._ip_address), self._lifetime, "".join(
+            ["{}({});".format(str(value.get_ip_address()), value.get_tech_type()) for (key, value) in self._next_address.items()]
         ))
 
 
@@ -102,8 +102,8 @@ class NodeTable(EventProducer):
     def remove_node_address_record(self, node_address: NodeAddress):
         if str(node_address.get_ip_address()) in self._nodes[node_address.get_tech_type()]:
             next_node_addresses = self._nodes[node_address.get_tech_type()][str(node_address.get_ip_address())].get_node_addresses()
-            for next_node_address in next_node_addresses:
-                next_node_address.remove_next_node_address(node_address)
+            for key in list(next_node_addresses):
+                next_node_addresses[key].remove_next_node_address(node_address)
             del self._nodes[node_address.get_tech_type()][str(node_address.get_ip_address())]
 
     def decrease_lifetime(self):
@@ -115,23 +115,30 @@ class NodeTable(EventProducer):
                     self.remove_node_address_record(node)
 
     def __str__(self):
-        result = ""
+        result = "Node Table\n{:<30}{:<10}[{}]\n".format("Dst IP", "Lifetime", "next Ip address(technology);")
         for tech_type in self._types:
-            result += "tech {}: \n{}\n".format(tech_type, "\n".join(
+            result += "Technology {}: \n{}\n".format(tech_type, "\n".join(
                 ["{}".format(value) for (key, value) in self._nodes[tech_type].items()]
             ))
         return result
+
+    def print_table(self):
+        print(str(self))
 
 
 class PendingEntry(Thread):
     MAX_ATTEMPTS = 4
     ATTEMPT_DELAY_MULTIPLICATION = 5
+    STATUS_PENDING = 1
+    STATUS_SUCCESS = 2
+    STATUS_FAILED = 3
 
     def __init__(self, address: str, sender_function):
         Thread.__init__(self)
         self._address = address
         self._sender_function = sender_function
         self._attempt = 0
+        self._status = self.STATUS_PENDING
 
     def inc_attempt(self):
         self._attempt += 1
@@ -139,17 +146,23 @@ class PendingEntry(Thread):
     def get_attempt(self):
         return self._attempt
 
+    def set_status(self, status: int):
+        if status in [self.STATUS_FAILED, self.STATUS_SUCCESS, self.STATUS_PENDING]:
+            self._status = status
+
     def run(self):
         while self._attempt <= PendingEntry.MAX_ATTEMPTS:
             self._sender_function(self._address)
             self.inc_attempt()
             time.sleep(self._attempt * PendingEntry.ATTEMPT_DELAY_MULTIPLICATION)
+        if self._status == self.STATUS_PENDING:
+            self._status = PendingEntry.STATUS_FAILED
 
     def finish(self):
         self._attempt = PendingEntry.MAX_ATTEMPTS + 1
 
     def __str__(self):
-        return "IP: {} attempt: {}".format(self._address, self._attempt)
+        return "{:<30}{:5}{:15}".format(self._address, self._attempt, self._status)
 
 
 class PendingSolicitations:
@@ -167,6 +180,10 @@ class PendingSolicitations:
             self._pendings[address].finish()
             del self._pendings[address]
 
+    def get_pending(self, address: str):
+        if address in self._pendings:
+            return self._pendings[address]
+
     def has_pending(self, address: str):
         return address in self._pendings
 
@@ -175,7 +192,13 @@ class PendingSolicitations:
             self._pendings[address].inc_attempt()
 
     def __str__(self):
-        return "".join(["{}\n".format(value) for (key, value) in self._pendings.items()])
+        header = "{:<30}{:10}{:15}\n".format("Ip address", "Attempt", "Status({}-pending/{}-success/{}-failed)".format(
+            PendingEntry.STATUS_PENDING, PendingEntry.STATUS_SUCCESS, PendingEntry.STATUS_FAILED
+        ))
+        return header + "".join(["{}\n".format(value) for (key, value) in self._pendings.items()])
+
+    def print_pendings(self):
+        print(self)
 
 
 class NeighborManager(EventListener):
@@ -194,14 +217,19 @@ class NeighborManager(EventListener):
             self._sender.send_icmpv6_na(src_ip=event.get_event()["src_ip"], target_ip=event.get_event()["target_ip"])
 
         elif isinstance(event, NewNodeEvent):
-            new_ip = str(event.get_event().get_ip_address())
-            self._pendings.add_pending(new_ip, self._sender.send_icmpv6_ns)
+            technology = event.get_event().get_tech_type()
+            if technology != "wifi":
+                new_ip = str(event.get_event().get_ip_address())
+                self._pendings.add_pending(new_ip, self._sender.send_icmpv6_ns)
 
         elif isinstance(event, NeighbourAdvertisementEvent):
             src_ip = event.get_event()["src_ip"]
             target_ip = event.get_event()["target_ip"]
             if self._pendings.has_pending(target_ip):
-                self._pendings.remove_pending(target_ip)
+                pending = self._pendings.get_pending(target_ip)
+                if pending:
+                    pending.set_status(PendingEntry.STATUS_SUCCESS)
+                # self._pendings.remove_pending(target_ip)
 
                 wifi_node_address = self._node_table.get_node_address(src_ip, 'wifi')
                 if not wifi_node_address:
@@ -211,7 +239,6 @@ class NeighborManager(EventListener):
                 mote_node_address = self._node_table.get_node_address(target_ip, 'rpl')
                 if mote_node_address:
                     mote_node_address.add_next_node_address(wifi_node_address)
-                print("{}".format(self._node_table))
         elif isinstance(event, RequestRouteToMoteEvent):
             node = self._node_table.get_node_address(event.get_event()["ip_addr"], 'rpl')
             if node and node.has_neighbor_with_tech('wifi'):

@@ -7,6 +7,7 @@ from neighbors import PendingSolicitations, NewNodeEvent, NodeTable
 from utils.configuration_loader import ConfigurationLoader
 from data import Data, IpConfigurator, ChangeModeEvent
 from neighbors import NeighborManager
+from command_listener import CommandListener, Command
 import configparser
 import os
 import logging
@@ -20,10 +21,12 @@ class Boot(object):
         logging.basicConfig(filename='prod.log', level=logging.DEBUG, format='%(asctime)s [%(levelname)s] %(message)s',
                             datefmt='%m/%d/%Y %I:%M:%S %p')
         logging.info('BRIDGE:starting bridge')
+        logging.getLogger("scapy.runtime").setLevel(logging.CRITICAL)
 
         self._load_config()
         self._load_services()
         self._boot_event_subscribers()
+        self._load_commands()
 
     def _load_config(self):
         self.configLoader = ConfigurationLoader(configparser.ConfigParser())
@@ -47,6 +50,7 @@ class Boot(object):
                                                self._data.get_configuration()['wifi']['subnet'],
                                                self._data.get_configuration()['border-router']['ipv6'])
         self._purge_timer = PurgeTimer(1, self._node_table)
+        self._command_listener = CommandListener()
 
     def _boot_event_subscribers(self):
         self._input_parser.subscribe_event(ContikiBootEvent, self._slip_commands)
@@ -60,9 +64,19 @@ class Boot(object):
         self._input_parser.subscribe_event(RequestRouteToMoteEvent, self._neighbour_manager)
         self._data.subscribe_event(ChangeModeEvent, self._ip_configurator)
 
+    def _load_commands(self):
+        self._command_listener.add_command(Command("node", self._node_table.print_table, "Shows node table"))
+        self._command_listener.add_command(Command("metric", self._slip_commands.print_metrics_request,
+                                                   "Shows metrics table"))
+        self._command_listener.add_command(Command("flow", self._slip_commands.print_flows_request, "Shows flow table"))
+        self._command_listener.add_command(Command("data", self._data.print_data, "Prints bridge internal data"))
+        self._command_listener.add_command(Command("pending", self._pending_solicitations.print_pendings,
+                                                   "Prints ICMPv6 pending"))
+
     def run(self):
         try:
             self._slip_listener.start()
+            self._command_listener.start()
         except:
             print("Error: unable to start thread")
 

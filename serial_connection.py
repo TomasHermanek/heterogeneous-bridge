@@ -48,9 +48,17 @@ class InputParser(EventProducer):
         self.add_event_support(SlipPacketToSendEvent)
         self.add_event_support(SettingMoteGlobalAddressEvent)
         self.add_event_support(RequestRouteToMoteEvent)
+        self._reading_print = False
 
     def parse(self, line):
-        if line[:2] == b'!r':
+        if line[:2] == b'<-':
+            self._reading_print = True
+            print("\n")
+        elif line[:2] == b'->':
+            self._reading_print = False
+        elif self._reading_print:
+            print(line.decode("utf-8"))
+        elif line[:2] == b'!r':
             line = line.decode("utf-8")
             addresses = line[2:-1].split(';')
             for address in addresses:
@@ -128,6 +136,12 @@ class SlipCommands(EventListener):
     def __init__(self, slip_sender: SlipSender, data: Data):
         self._slip_sender = slip_sender
         self._data = data
+
+    def print_flows_request(self):
+        self._slip_sender.send(str.encode("#f"))
+
+    def print_metrics_request(self):
+        self._slip_sender.send(str.encode("#m"))
 
     def send_config_to_contiki(self):
         metrics = self._data.get_configuration()['metrics']

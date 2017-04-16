@@ -106,17 +106,17 @@ class PacketSender(EventListener):
         udp = UDP()
         udp.sport = int(values[1])
         udp.dport = int(values[2])
-        send(ip_w / ip_r / udp / values[3])
+        send(ip_w / ip_r / udp / values[3], verbose=False)
         logging.debug('BRIDGE:sending packet using "{}"'.format(self.iface))
 
     def send_icmpv6_ns(self, ip_addr: str):
         ip = IPv6()
         ip.src = self._data.get_wifi_global_address()
-        print("sending icmp using global ip {}".format(self._data.get_wifi_global_address()))
+        # print("sending icmp using global ip {}".format(self._data.get_wifi_global_address()))
         ip.dst = "ff02::1"
         icmp = ICMPv6ND_NS()
         icmp.tgt = ip_addr
-        send(ip / icmp)
+        send(ip / icmp, verbose=False)
         logging.debug('BRIDGE:sending neighbour solicitation for target ip "{}"'.format(ip_addr))
 
     def send_icmpv6_na(self, src_ip: str, target_ip: str):
@@ -125,7 +125,7 @@ class PacketSender(EventListener):
         ip.dst = src_ip
         icmp = ICMPv6ND_NA()
         icmp.tgt = target_ip
-        send(ip / icmp)
+        send(ip / icmp, verbose=False)
 
     def notify(self, event: Event):
         from serial_connection import SlipPacketToSendEvent
