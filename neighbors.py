@@ -5,14 +5,15 @@ from threading import Thread
 from event_system import EventListener, Event, EventProducer
 from data import Data
 import time
+import math
 
 
 class NodeAddress:
-    _reset_lifetime = 255
+    DEFAULT_LIFETIME = 255
 
     def __init__(self, ip_address: IPv6Address, tech_type):
         self._ip_address = ip_address
-        self._lifetime = self._reset_lifetime
+        self._lifetime = self.DEFAULT_LIFETIME
         self._type = tech_type
         self._next_address = {}
 
@@ -32,10 +33,11 @@ class NodeAddress:
         return self._lifetime
 
     def reset_lifetime(self):
-        self._lifetime = self._reset_lifetime
+        self._lifetime = self.DEFAULT_LIFETIME
 
     def decrease_lifetime(self):
         self._lifetime -= 1
+        return self._lifetime
 
     def add_next_node_address(self, node_address):
         if str(node_address.get_ip_address()) not in self._next_address:
@@ -66,10 +68,21 @@ class NewNodeEvent(Event):
         return "new-node-event"
 
 
+class NodeRefreshEvent(Event):
+    def __init__(self, data: NodeAddress):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "node-refresh-event"
+
+
 class NodeTable(EventProducer):
+    WIFI_NODE_REFRESH_INTERVAL = math.floor(NodeAddress.DEFAULT_LIFETIME / 2)
+
     def __init__(self, types: list):
         EventProducer.__init__(self)
         self.add_event_support(NewNodeEvent)
+        self.add_event_support(NodeRefreshEvent)
         self._nodes = {}
         self._types = types
         for tech_type in types:
@@ -111,6 +124,8 @@ class NodeTable(EventProducer):
             for node_key in list(self._nodes[tech_type]):
                 node = self._nodes[tech_type][node_key]
                 node.decrease_lifetime()
+                if tech_type == "wifi" and node.get_lifetime() == self.WIFI_NODE_REFRESH_INTERVAL:
+                    self.notify_listeners(NodeRefreshEvent(node))
                 if node.get_lifetime() <= 0:
                     self.remove_node_address_record(node)
 
@@ -151,7 +166,7 @@ class PendingEntry(Thread):
             self._status = status
 
     def run(self):
-        while self._attempt <= PendingEntry.MAX_ATTEMPTS:
+        while self._status == self.STATUS_PENDING and self._attempt <= PendingEntry.MAX_ATTEMPTS:
             self._sender_function(self._address)
             self.inc_attempt()
             time.sleep(self._attempt * PendingEntry.ATTEMPT_DELAY_MULTIPLICATION)
@@ -221,7 +236,17 @@ class NeighborManager(EventListener):
             if technology != "wifi":
                 new_ip = str(event.get_event().get_ip_address())
                 self._pendings.add_pending(new_ip, self._sender.send_icmpv6_ns)
-
+        elif isinstance(event, NodeRefreshEvent):
+            technology = event.get_event().get_tech_type()
+            if technology == "wifi":
+                mote_ip = None
+                next_node = event.get_event().get_node_addresses()
+                for key in next_node:
+                    if next_node[key].get_tech_type() == "rpl":
+                        mote_ip = str(next_node[key].get_ip_address())
+                if mote_ip:
+                    self._pendings.remove_pending(mote_ip)
+                    self._pendings.add_pending(mote_ip, self._sender.send_icmpv6_ns)
         elif isinstance(event, NeighbourAdvertisementEvent):
             src_ip = event.get_event()["src_ip"]
             target_ip = event.get_event()["target_ip"]

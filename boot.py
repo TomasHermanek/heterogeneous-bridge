@@ -3,7 +3,7 @@ from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPa
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender, \
     MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent
-from neighbors import PendingSolicitations, NewNodeEvent, NodeTable
+from neighbors import PendingSolicitations, NewNodeEvent, NodeTable, NodeRefreshEvent
 from utils.configuration_loader import ConfigurationLoader
 from data import Data, IpConfigurator, ChangeModeEvent
 from neighbors import NeighborManager
@@ -58,6 +58,7 @@ class Boot(object):
         self._interface_listener.get_ipv6_packet_parser().subscribe_event(IncomingPacketSendToSlipEvent,
                                                                           self._slip_commands)
         self._node_table.subscribe_event(NewNodeEvent, self._neighbour_manager)
+        self._node_table.subscribe_event(NodeRefreshEvent, self._neighbour_manager)
         self._packet_parser.subscribe_event(MoteNeighbourSolicitationEvent, self._neighbour_manager)
         self._packet_parser.subscribe_event(NeighbourAdvertisementEvent, self._neighbour_manager)
         self._input_parser.subscribe_event(SettingMoteGlobalAddressEvent, self._ip_configurator)
