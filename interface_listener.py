@@ -1,7 +1,6 @@
 from threading import Thread
 
 from scapy.all import *
-
 from data import Data
 from event_system import EventListener, Event, EventProducer
 
@@ -58,7 +57,6 @@ class Ipv6PacketParser(EventProducer):
     def _parse_icmpv6_ns(self, packet: Ether):      # refactor - add this to neighbour manager
         target_ip = packet[ICMPv6ND_NS].tgt
         src_ip = packet[IPv6].src
-
         if str(self._data.get_mote_global_address()) == target_ip or str(self._data.get_mote_link_local_address()) == target_ip:
             logging.warning('BRIDGE:Sending response to ICMPv6 neighbour solicitation for address "{}"'
                             .format(target_ip))
@@ -91,23 +89,39 @@ class Ipv6PacketParser(EventProducer):
 
 
 class PacketSender(EventListener):
-    def __init__(self, iface, data: Data):
+    def __init__(self, iface, data: Data, node_table):
         self.iface = iface
         self._data = data
+        self._node_table = node_table
 
-    def _packet_send_to_root(self, packet: str):
+    def send_packet(self, packet: str):
         values = packet.split(";")
-        ip_w = IPv6()
-        ip_w.src = self._data.get_wifi_global_address()
-        ip_w.dst = self._data.get_configuration()['border-router']['ipv6']
-        ip_r = IPv6()
-        ip_r.src = self._data.get_mote_global_address()
-        ip_r.dst = values[0]
-        udp = UDP()
-        udp.sport = int(values[1])
-        udp.dport = int(values[2])
-        send(ip_w / ip_r / udp / values[3], verbose=False)
-        logging.debug('BRIDGE:sending packet using "{}"'.format(self.iface))
+        print(packet)
+        dst_ip = None
+        if self._data.get_mode() == Data.MODE_NODE:
+            dst_ip = self._data.get_configuration()['border-router']['ipv6']
+        else:
+            node = self._node_table.get_node_address(values[1], 'rpl')
+            print(node)
+            next_nodes = node.get_node_addresses()
+            for addr in next_nodes:
+                if next_nodes[addr].get_tech_type() == "wifi":
+                    dst_ip = addr
+
+        if dst_ip:
+            ip_w = IPv6()
+            ip_w.src = self._data.get_wifi_global_address()
+            ip_w.dst = dst_ip
+            ip_r = IPv6()
+            ip_r.src = values[0]
+            ip_r.dst = values[1]
+            udp = UDP()
+            udp.sport = int(values[2])
+            udp.dport = int(values[3])
+            send(ip_w / ip_r / udp / values[4], verbose=False)
+            logging.debug('BRIDGE:sending packet using "{}"'.format(self.iface))
+        else:
+            print("Unknown destination address while packet sending")
 
     def send_icmpv6_ns(self, ip_addr: str):
         ip = IPv6()
@@ -130,13 +144,12 @@ class PacketSender(EventListener):
     def notify(self, event: Event):
         from serial_connection import SlipPacketToSendEvent
         if isinstance(event, SlipPacketToSendEvent):
-            if not self._data.get_mote_global_address():
-                logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
-                return
-
+            # if not self._data.get_mote_global_address():
+            #     logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
+            #     return
             packet_to_send = event.get_event()
-            packet_to_send_decoded = packet_to_send[2:-1].decode("utf-8")
-            self._packet_send_to_root(packet_to_send_decoded)
+            packet_to_send_decoded = packet_to_send[3:-1].decode("utf-8")
+            self.send_packet(packet_to_send_decoded)
 
     def __str__(self):
         return "packet-sender"

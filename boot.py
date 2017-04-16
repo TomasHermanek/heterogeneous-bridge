@@ -44,7 +44,7 @@ class Boot(object):
         self._packet_parser = Ipv6PacketParser(self._data)
         self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'], self._packet_parser)
         self._slip_commands = SlipCommands(self._slip_sender, self._data)
-        self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data)
+        self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data, self._node_table)
         self._neighbour_manager = NeighborManager(self._node_table, self._data, self._pending_solicitations, self._packed_sender, self._slip_commands)
         self._neighbour_request_timer = NeighbourRequestTimer(10, self._slip_commands)
         self._ip_configurator = IpConfigurator(self._data, self._data.get_configuration()['wifi']['device'],

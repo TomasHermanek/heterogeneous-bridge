@@ -53,6 +53,9 @@ class Data(EventProducer):
     def get_configuration(self):
         return self._configuration
 
+    def get_mode(self):
+        return self._mode
+
     def print_data(self):
         print('Bridge mode: {}\nMote global IP: {:>30}\nMote local IP: {:>30}\nWifi global IP: {:>30}\n'.
               format("ROOT" if self._mode == self.MODE_ROOT else "NODE", self._mote_global_address,
