@@ -66,6 +66,14 @@ class IpConfigurator(EventListener):
         self._root_address = root_address
         self._prefix = IPv6Network(prefix)
 
+    def _add_route(self, address: str):
+        logging.debug('BRIDGE:adding route to "{}" via "{}" interface'.format(address, self._iface))
+        os.system("ip -6 route add {} dev {}".format(address, self._iface))
+
+    def _remove_route(self, address: str):
+        logging.debug('BRIDGE:removing route to "{}" via "{}" interface'.format(address, self._iface))
+        os.system("ip -6 route del {} dev {}".format(address, self._iface))
+
     def _unset_address(self, address: str):
         logging.debug('BRIDGE:removing address "{}" from "{}" interface'.format(address, self._iface))
         os.system("ifconfig {} del {}".format(self._iface, address))
@@ -96,6 +104,7 @@ class IpConfigurator(EventListener):
         self._remove_current_addresses_from_prefix(current_addresses)
         last_ocet = mote_global_address.split(":")[-1]
         wifi_global_address = str(self._prefix).replace("::", "::{}".format(last_ocet))
+
         if wifi_global_address != self._data.get_wifi_global_address():
             self._set_address(wifi_global_address)
             self._data.set_wifi_global_address(wifi_global_address.split("/")[0])
@@ -108,8 +117,10 @@ class IpConfigurator(EventListener):
             mode = event.get_event()
             if mode == Data.MODE_NODE:
                 self._unset_address(self._root_address)
+                self._add_route(self._root_address)
             elif mode == Data.MODE_ROOT:
                 self._set_address(self._root_address)
+                self._remove_route(self._root_address)
 
     def __str__(self):
         return "ip-configurator"
