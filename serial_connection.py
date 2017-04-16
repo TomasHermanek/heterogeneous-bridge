@@ -101,6 +101,7 @@ class InputParser(EventProducer):
                         logging.error('BRIDGE:neighbour ip address "{} is not valid'.format(node))
 
         else:
+            print(line)
             logging.debug('CONTIKI:{}'.format(line))
 
 

@@ -10,6 +10,7 @@ from neighbors import NeighborManager
 from command_listener import CommandListener, Command
 import configparser
 import os
+import time
 import logging
 
 
@@ -77,18 +78,24 @@ class Boot(object):
     def run(self):
         try:
             self._slip_listener.start()
-            self._command_listener.start()
         except:
             print("Error: unable to start thread")
 
         self._data.set_mode(Data.MODE_NODE)
         self._slip_commands.request_config_from_contiki()
         self._slip_commands.send_config_to_contiki()
-        # todo create mechanism which handles fact, that while init boot is not complete -> other listeners must wait
+
+        print("Loading")
+        while not self._data.get_mote_global_address():
+            print(".")
+            time.sleep(1)
+        print("Configuration loaded, loading listeners")
         try:
             self._interface_listener.start()
             self._neighbour_request_timer.start()
             self._purge_timer.start()
+            print("Listeners loaded, starting command line")
+            self._command_listener.start()
         except:
             print("Error: unable to start thread")
         while 1:
