@@ -20,8 +20,8 @@ class NodeAddress:
         return self._ip_address
 
     def has_neighbor_with_tech(self, tech_type: str):
-        for next_address in self._next_address:
-            if next_address.get_tech_type() == tech_type:
+        for key in self._next_address:
+            if self._next_address[key].get_tech_type() == tech_type:
                 return True
         return False
 
