@@ -2,10 +2,10 @@ from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPa
     InputParser, SettingMoteGlobalAddressEvent, RequestRouteToMoteEvent
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender, \
-    MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent
+    MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent, RootPacketForwardEvent
 from neighbors import PendingSolicitations, NewNodeEvent, NodeTable, NodeRefreshEvent
 from utils.configuration_loader import ConfigurationLoader
-from data import Data, IpConfigurator, ChangeModeEvent
+from data import Data, IpConfigurator, ChangeModeEvent, PacketBuffer, PacketBuffEvent
 from neighbors import NeighborManager
 from command_listener import CommandListener, Command
 import configparser
@@ -41,7 +41,7 @@ class Boot(object):
         self._input_parser = InputParser(self._data, self._node_table)
         self._slip_listener = SlipListener(self._data.get_configuration()['serial']['device'], self._data,
                                            self._input_parser)
-        self._packet_parser = Ipv6PacketParser(self._data)
+        self._packet_parser = Ipv6PacketParser(self._data, self._node_table)
         self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'], self._packet_parser)
         self._slip_commands = SlipCommands(self._slip_sender, self._data)
         self._packed_sender = PacketSender(self._data.get_configuration()['wifi']['device'], self._data, self._node_table)
@@ -52,6 +52,7 @@ class Boot(object):
                                                self._data.get_configuration()['border-router']['ipv6'])
         self._purge_timer = PurgeTimer(1, self._node_table)
         self._command_listener = CommandListener()
+        self._packet_buffer = PacketBuffer()
 
     def _boot_event_subscribers(self):
         self._input_parser.subscribe_event(ContikiBootEvent, self._slip_commands)
@@ -62,9 +63,11 @@ class Boot(object):
         self._node_table.subscribe_event(NodeRefreshEvent, self._neighbour_manager)
         self._packet_parser.subscribe_event(MoteNeighbourSolicitationEvent, self._neighbour_manager)
         self._packet_parser.subscribe_event(NeighbourAdvertisementEvent, self._neighbour_manager)
+        self._packet_parser.subscribe_event(RootPacketForwardEvent, self._packet_buffer)
         self._input_parser.subscribe_event(SettingMoteGlobalAddressEvent, self._ip_configurator)
         self._input_parser.subscribe_event(RequestRouteToMoteEvent, self._neighbour_manager)
         self._data.subscribe_event(ChangeModeEvent, self._ip_configurator)
+        self._packet_buffer.subscribe_event(PacketBuffEvent, self._slip_commands)
 
     def _load_commands(self):
         self._command_listener.add_command(Command("node", self._node_table.print_table, "Shows node table"))

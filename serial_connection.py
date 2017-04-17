@@ -163,16 +163,24 @@ class SlipCommands(EventListener):
         self._slip_sender.send(b'?n\n')
         logging.info('BRIDGE:requesting neighbours from contiki')
 
+    def request_forward_packet_decision(self, id: int, raw_packet: str):
+        self._slip_sender.send(str.encode("?p;{};{}\n".format(id, raw_packet)))
+        logging.info('BRIDGE:requesting forward decision')
+
     def send_packet_to_contiki(self, raw_packet: str):
         self._slip_sender.send(str.encode("!p;{}\n".format(raw_packet)))
         logging.debug('BRIDGE:sending packet to contiki')
 
     def notify(self, event: Event):
         from interface_listener import IncomingPacketSendToSlipEvent
+        from data import PacketBuffEvent
         if isinstance(event, ContikiBootEvent):
             self.send_config_to_contiki()
         elif isinstance(event, IncomingPacketSendToSlipEvent):
             self.send_packet_to_contiki(event.get_event())
+        elif isinstance(event, PacketBuffEvent):
+            self.request_forward_packet_decision(event.get_event()["id"], event.get_event()["packet"])
+
 
     def __str__(self):
         return "slip-commands"

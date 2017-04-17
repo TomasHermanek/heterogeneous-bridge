@@ -1,5 +1,4 @@
 from threading import Thread
-
 from scapy.all import *
 from data import Data
 from event_system import EventListener, Event, EventProducer
@@ -29,13 +28,23 @@ class NeighbourAdvertisementEvent(Event):
         return "neighbour-advertisement-event"
 
 
+class RootPacketForwardEvent(Event):
+    def __init__(self, data: str):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "root-packet-forward"
+
+
 class Ipv6PacketParser(EventProducer):
-    def __init__(self, data: Data):
+    def __init__(self, data: Data, node_table):
         EventProducer.__init__(self)
         self._data = data
+        self._node_table = node_table
         self.add_event_support(IncomingPacketSendToSlipEvent)
         self.add_event_support(MoteNeighbourSolicitationEvent)
         self.add_event_support(NeighbourAdvertisementEvent)
+        self.add_event_support(RootPacketForwardEvent)
 
     """
     Packed sent from another mote via WIFI must contains two IP headers, first one is used by internal WIFI, but second
@@ -43,16 +52,27 @@ class Ipv6PacketParser(EventProducer):
     """
     def _parse_udp(self, packet: Ether):
         ip = packet[IPv6]
-        # print("comparing {} vs {}".format(ip[1].dst, self._data.get_src_ip()))
-        if ip[1].dst == self._data.get_mote_global_address():
-            # print("target is my mote")
-            udp = packet[UDP]
-            raw = packet[Raw]
-            src_addr = ipaddress.ip_address(ip[1].src)
-            dst_addr = ipaddress.ip_address(ip[1].dst)
-            contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport,
-                                                     raw.load.decode("utf-8"))
-            self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
+        udp = packet[UDP]
+        raw = packet[Raw]
+        src_addr = ipaddress.ip_address(ip[1].src)
+        dst_addr = ipaddress.ip_address(ip[1].dst)
+        contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport,
+                                                 raw.load.decode("utf-8"))
+
+        if self._data.get_mode() == Data.MODE_ROOT and ip[0].dst == self._data.get_configuration()['border-router']['ipv6']:
+            ask = False
+            node_address = self._node_table.get_node_address(ip[1].dst, 'rpl')
+            next_nodes = node_address.get_node_addresses()
+            for key in next_nodes:
+                if next_nodes[key].get_tech_type() == "wifi":
+                    ask = True
+                    self.notify_listeners(RootPacketForwardEvent(contiki_packet))
+            if not ask:
+                pass
+                 # self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
+        elif ip[0].dst == self._data.get_wifi_global_address():
+            if ip[1].dst == self._data.get_mote_global_address():
+                self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
 
     def _parse_icmpv6_ns(self, packet: Ether):      # refactor - add this to neighbour manager
         target_ip = packet[ICMPv6ND_NS].tgt

@@ -6,6 +6,41 @@ from ipaddress import IPv6Address, IPv6Network, AddressValueError
 from event_system import EventProducer, Event, EventListener
 
 
+class PacketBuffEvent(Event):
+    def __init__(self, data: dict):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "packet-buff-event"
+
+
+class PacketBuffer(EventProducer, EventListener):
+    def __init__(self):
+        self.counter = 1
+        self._packets = {}
+        EventListener.__init__(self)
+        EventProducer.__init__(self)
+        self.add_event_support(PacketBuffEvent)
+
+    def add_packet(self, packet: str):
+        self._packets.update({
+            self.counter: packet
+        })
+        self.notify_listeners(PacketBuffEvent({
+            "id": self.counter,
+            "packet": packet
+        }))
+        self.counter += 1
+
+    def notify(self, event: Event):
+        from interface_listener import RootPacketForwardEvent
+        if isinstance(event, RootPacketForwardEvent):
+            self.add_packet(event.get_event())
+
+    def __str__(self):
+        return "packet-buffer"
+
+
 class ChangeModeEvent(Event):
     def __init__(self, data: int):
         Event.__init__(self, data)
