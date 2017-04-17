@@ -1,5 +1,5 @@
 from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPacketToSendEvent, SlipCommands, \
-    InputParser, SettingMoteGlobalAddressEvent, RequestRouteToMoteEvent
+    InputParser, SettingMoteGlobalAddressEvent, RequestRouteToMoteEvent, ResponseToPacketRequest
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender, \
     MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent, RootPacketForwardEvent
@@ -68,6 +68,7 @@ class Boot(object):
         self._input_parser.subscribe_event(RequestRouteToMoteEvent, self._neighbour_manager)
         self._data.subscribe_event(ChangeModeEvent, self._ip_configurator)
         self._packet_buffer.subscribe_event(PacketBuffEvent, self._slip_commands)
+        self._input_parser.subscribe_event(ResponseToPacketRequest, self._packet_buffer)
 
     def _load_commands(self):
         self._command_listener.add_command(Command("node", self._node_table.print_table, "Shows node table"))
@@ -77,6 +78,8 @@ class Boot(object):
         self._command_listener.add_command(Command("data", self._data.print_data, "Prints bridge internal data"))
         self._command_listener.add_command(Command("pending", self._pending_solicitations.print_pendings,
                                                    "Prints ICMPv6 pending"))
+        self._command_listener.add_command(Command("buffer", self._packet_buffer.print_buffer_stats,
+                                                   "Shows packet buffer stats"))
 
     def run(self):
         try:

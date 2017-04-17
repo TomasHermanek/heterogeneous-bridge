@@ -39,6 +39,14 @@ class RequestRouteToMoteEvent(Event):
         return "request-route-to-mote-event"
 
 
+class ResponseToPacketRequest(Event):
+    def __init__(self, data: dict):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "response-to-packet-request-event"
+
+
 class InputParser(EventProducer):
     def __init__(self, data: Data, node_table: NodeTable):
         EventProducer.__init__(self)
@@ -48,6 +56,7 @@ class InputParser(EventProducer):
         self.add_event_support(SlipPacketToSendEvent)
         self.add_event_support(SettingMoteGlobalAddressEvent)
         self.add_event_support(RequestRouteToMoteEvent)
+        self.add_event_support(ResponseToPacketRequest)
         self._reading_print = False
 
     def parse(self, line):
@@ -79,6 +88,13 @@ class InputParser(EventProducer):
                 "ip_addr": ip_addr
             }))
             logging.debug('BRIDGE:contiki needs wants to use wifi for target host "{}"'.format(ip_addr))
+        elif line[:2] == b'$p':
+            line = line.decode("utf-8")
+            (question_id, response) = line[3:].split(";")
+            self.notify_listeners(ResponseToPacketRequest({
+                "question_id": int(question_id),
+                "response": True if response == "1" else False
+            }))
         elif line[:2] == b'!p':
             self.notify_listeners(SlipPacketToSendEvent(line))
             logging.debug('BRIDGE:incoming packet to send')

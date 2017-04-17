@@ -14,9 +14,12 @@ class PacketBuffEvent(Event):
         return "packet-buff-event"
 
 
-class PacketBuffer(EventProducer, EventListener):
+class PacketBuffer(EventProducer, EventListener):       # todo create packet buffer maximum limit
     def __init__(self):
         self.counter = 1
+        self.rpl_sent = 0
+        self.wifi_sent = 0
+        self.wrong = 0
         self._packets = {}
         EventListener.__init__(self)
         EventProducer.__init__(self)
@@ -32,13 +35,32 @@ class PacketBuffer(EventProducer, EventListener):
         }))
         self.counter += 1
 
+    def handle_packet(self, id: int, response: bool):
+        if id in self._packets:
+            if response:
+                print("sending packet with wifi\n")
+                print("{}\n".format(self._packets[id]))
+                self.wifi_sent += 1
+            else:
+                self.rpl_sent += 1
+            del self._packets[id]
+        else:
+            self.wrong += 1
+
     def notify(self, event: Event):
         from interface_listener import RootPacketForwardEvent
+        from serial_connection import ResponseToPacketRequest
         if isinstance(event, RootPacketForwardEvent):
             self.add_packet(event.get_event())
+        if isinstance(event, ResponseToPacketRequest):
+            self.handle_packet(event.get_event()["question_id"], event.get_event()["response"])
 
     def __str__(self):
         return "packet-buffer"
+
+    def print_buffer_stats(self):
+        print("Waiting packets: {}\nSent wifi: {}\nSent rpl: {}\nWrong: {}\n".format(
+            len(self._packets), self.wifi_sent, self.rpl_sent, self.wrong))
 
 
 class ChangeModeEvent(Event):
