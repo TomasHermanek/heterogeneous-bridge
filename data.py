@@ -2,7 +2,6 @@ import logging
 import netifaces
 import os
 from ipaddress import IPv6Address, IPv6Network, AddressValueError
-
 from event_system import EventProducer, Event, EventListener
 
 
@@ -16,6 +15,7 @@ class PacketBuffEvent(Event):
 
 class PacketBuffer(EventProducer, EventListener):       # todo create packet buffer maximum limit
     def __init__(self):
+        from serial_connection import SlipPacketToSendEvent
         self.counter = 1
         self.rpl_sent = 0
         self.wifi_sent = 0
@@ -24,6 +24,7 @@ class PacketBuffer(EventProducer, EventListener):       # todo create packet buf
         EventListener.__init__(self)
         EventProducer.__init__(self)
         self.add_event_support(PacketBuffEvent)
+        self.add_event_support(SlipPacketToSendEvent)
 
     def add_packet(self, packet: str):
         self._packets.update({
@@ -36,10 +37,10 @@ class PacketBuffer(EventProducer, EventListener):       # todo create packet buf
         self.counter += 1
 
     def handle_packet(self, id: int, response: bool):
+        from serial_connection import SlipPacketToSendEvent
         if id in self._packets:
             if response:
-                print("sending packet with wifi\n")
-                print("{}\n".format(self._packets[id]))
+                self.notify_listeners(SlipPacketToSendEvent(self._packets[id]))
                 self.wifi_sent += 1
             else:
                 self.rpl_sent += 1

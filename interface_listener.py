@@ -67,7 +67,7 @@ class Ipv6PacketParser(EventProducer):
                 if next_nodes[key].get_tech_type() == "wifi":
                     ask = True
                     self.notify_listeners(RootPacketForwardEvent(contiki_packet))
-            if not ask:
+            if not ask: # arrived packet ro send over WIFI
                 pass
                  # self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
         elif ip[0].dst == self._data.get_wifi_global_address():
@@ -116,17 +116,16 @@ class PacketSender(EventListener):
 
     def send_packet(self, packet: str):
         values = packet.split(";")
-        print(packet)
         dst_ip = None
         if self._data.get_mode() == Data.MODE_NODE:
             dst_ip = self._data.get_configuration()['border-router']['ipv6']
         else:
             node = self._node_table.get_node_address(values[1], 'rpl')
-            print(node)
-            next_nodes = node.get_node_addresses()
-            for addr in next_nodes:
-                if next_nodes[addr].get_tech_type() == "wifi":
-                    dst_ip = addr
+            if node:
+                next_nodes = node.get_node_addresses()
+                for addr in next_nodes:
+                    if next_nodes[addr].get_tech_type() == "wifi":
+                        dst_ip = addr
 
         if dst_ip:
             ip_w = IPv6()
@@ -167,9 +166,9 @@ class PacketSender(EventListener):
             # if not self._data.get_mote_global_address():
             #     logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
             #     return
-            packet_to_send = event.get_event()
-            packet_to_send_decoded = packet_to_send[3:-1].decode("utf-8")
-            self.send_packet(packet_to_send_decoded)
+            # packet_to_send = event.get_event()
+            # packet_to_send_decoded = packet_to_send[3:-1].decode("utf-8")
+            self.send_packet(event.get_event())
 
     def __str__(self):
         return "packet-sender"

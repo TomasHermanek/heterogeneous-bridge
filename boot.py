@@ -56,6 +56,7 @@ class Boot(object):
 
     def _boot_event_subscribers(self):
         self._input_parser.subscribe_event(ContikiBootEvent, self._slip_commands)
+        self._packet_buffer.subscribe_event(SlipPacketToSendEvent, self._packed_sender)
         self._input_parser.subscribe_event(SlipPacketToSendEvent, self._packed_sender)
         self._interface_listener.get_ipv6_packet_parser().subscribe_event(IncomingPacketSendToSlipEvent,
                                                                           self._slip_commands)

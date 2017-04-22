@@ -97,8 +97,9 @@ class NodeTable(EventProducer):
         return False
 
     def get_node_address(self, address: str, type: str):
-        if address in self._nodes[type]:
-            return self._nodes[type][address]
+        addr = IPv6Address(address).compressed      # todo make another solution
+        if addr in self._nodes[type]:
+            return self._nodes[type][addr]
         return None
 
     def add_node_address(self, node_address: NodeAddress):

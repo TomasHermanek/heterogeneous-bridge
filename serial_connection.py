@@ -90,13 +90,17 @@ class InputParser(EventProducer):
             logging.debug('BRIDGE:contiki needs wants to use wifi for target host "{}"'.format(ip_addr))
         elif line[:2] == b'$p':
             line = line.decode("utf-8")
-            (question_id, response) = line[3:].split(";")
+            try:
+                (question_id, response) = line[3:].split(";")
+            except ValueError:
+                print("Error in line split\n", (line[3:].split(";")))
+                return
             self.notify_listeners(ResponseToPacketRequest({
                 "question_id": int(question_id),
                 "response": True if response == "1" else False
             }))
         elif line[:2] == b'!p':
-            self.notify_listeners(SlipPacketToSendEvent(line))
+            self.notify_listeners(SlipPacketToSendEvent(line[3:-1].decode("utf-8")))
             logging.debug('BRIDGE:incoming packet to send')
         elif line[:2] == b'!b':
             self.notify_listeners(ContikiBootEvent(line))
