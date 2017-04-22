@@ -169,6 +169,7 @@ class IpConfigurator(EventListener):
         if wifi_global_address != self._data.get_wifi_global_address():
             self._set_address(wifi_global_address)
             self._data.set_wifi_global_address(wifi_global_address.split("/")[0])
+        self._add_route("default")
 
     def notify(self, event: Event):
         from serial_connection import SettingMoteGlobalAddressEvent
