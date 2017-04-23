@@ -1,5 +1,5 @@
 from serial_connection import SlipListener, SlipSender, ContikiBootEvent, SlipPacketToSendEvent, SlipCommands, \
-    InputParser, SettingMoteGlobalAddressEvent, RequestRouteToMoteEvent, ResponseToPacketRequest
+    SerialParser, SettingMoteGlobalAddressEvent, RequestRouteToMoteEvent, ResponseToPacketRequest
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, IncomingPacketSendToSlipEvent, PacketSender, \
     MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent, RootPacketForwardEvent
@@ -38,7 +38,7 @@ class Boot(object):
         self._node_table = NodeTable(self._tech_types)
         self._pending_solicitations = PendingSolicitations()
         self._slip_sender = SlipSender(self._data.get_configuration()['serial']['device'])
-        self._input_parser = InputParser(self._data, self._node_table)
+        self._input_parser = SerialParser(self._data, self._node_table)
         self._slip_listener = SlipListener(self._data.get_configuration()['serial']['device'], self._data,
                                            self._input_parser)
         self._packet_parser = Ipv6PacketParser(self._data, self._node_table)
