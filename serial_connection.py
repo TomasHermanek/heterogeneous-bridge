@@ -76,7 +76,7 @@ class SerialParser(EventProducer):
         elif line[:2] == b'->':
             self._reading_print = False
         elif self._reading_print:
-            print(line.decode("utf-8"))
+            print(line.decode("utf-8")[:-1])
         # sends contiki addresses
         elif line[:2] == b'!r':
             line = line.decode("utf-8")
@@ -177,6 +177,9 @@ class SlipCommands(EventListener):
 
     def print_metrics_request(self):
         self._slip_sender.send(str.encode("#m"))
+
+    def print_statistics(self):
+        self._slip_sender.send(str.encode("#s"))
 
     def send_config_to_contiki(self):
         metrics = self._data.get_configuration()['metrics']

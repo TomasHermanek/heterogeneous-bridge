@@ -76,6 +76,7 @@ class Boot(object):
         self._command_listener.add_command(Command("metric", self._slip_commands.print_metrics_request,
                                                    "Shows metrics table"))
         self._command_listener.add_command(Command("flow", self._slip_commands.print_flows_request, "Shows flow table"))
+        self._command_listener.add_command(Command("stats", self._slip_commands.print_statistics, "Prints contiki statistics"))
         self._command_listener.add_command(Command("data", self._data.print_data, "Prints bridge internal data"))
         self._command_listener.add_command(Command("pending", self._pending_solicitations.print_pendings,
                                                    "Prints ICMPv6 pending"))
