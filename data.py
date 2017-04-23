@@ -82,6 +82,7 @@ class Data(EventProducer):
         self._mote_global_address = None
         self._mote_link_local_address = None
         self._wifi_global_address = None
+        self._wifi_l2_address = None
         self._mode = None
         self._configuration = configuration
 
@@ -95,6 +96,12 @@ class Data(EventProducer):
 
     def get_wifi_global_address(self):
         return self._wifi_global_address
+
+    def set_wifi_l2_address(self, address):
+        self._wifi_l2_address = address
+
+    def get_wifi_l2_address(self):
+        return self._wifi_l2_address
 
     def set_mote_global_address(self, global_address):
         self._mote_global_address = global_address
@@ -115,12 +122,16 @@ class Data(EventProducer):
         return self._mode
 
     def print_data(self):
-        print('Bridge mode: {}\nMote global IP: {:>30}\nMote local IP: {:>30}\nWifi global IP: {:>30}\n'.
+        print('Bridge mode: {}\nMote global IP: {:>30}\nMote local IP: {:>30}\nWifi global IP: {:>30}\nWifi MAC{:>30}\n'.
               format("ROOT" if self._mode == self.MODE_ROOT else "NODE", self._mote_global_address,
-                     self._mote_link_local_address, self._wifi_global_address))
+                     self._mote_link_local_address, self._wifi_global_address, self._wifi_l2_address))
 
 
 class IpConfigurator(EventListener):
+    """
+    Class responsible for interface configuration
+    """
+
     def __init__(self, data: Data, iface: str, prefix: str, root_address: str):
         self._iface = iface
         self._data = data
@@ -135,15 +146,15 @@ class IpConfigurator(EventListener):
         logging.debug('BRIDGE:removing route to "{}" via "{}" interface'.format(address, self._iface))
         os.system("ip -6 route del {} dev {}".format(address, self._iface))
 
-    def _unset_address(self, address: str):
-        logging.debug('BRIDGE:removing address "{}" from "{}" interface'.format(address, self._iface))
-        os.system("ifconfig {} del {}".format(self._iface, address))
-
     def _set_address(self, address: str):
         logging.debug('BRIDGE:adding address "{}" to "{}" interface'.format(address, self._iface))
         os.system("ifconfig {} add {}".format(self._iface, address))
 
-    def _get_wifi_global_address(self):
+    def _unset_address(self, address: str):
+        logging.debug('BRIDGE:removing address "{}" from "{}" interface'.format(address, self._iface))
+        os.system("ifconfig {} del {}".format(self._iface, address))
+
+    def _get_wifi_global_addressees(self):
         interface = netifaces.ifaddresses(self._iface)
         try:
             return interface[netifaces.AF_INET6]
@@ -160,16 +171,29 @@ class IpConfigurator(EventListener):
             except AddressValueError:
                 logging.warning('BRIDGE:interface "{}" has not valid ipv6 address "{}"'.format(self._iface, address))
 
-    def set_wifi_ipv6_lobal_address(self, mote_global_address: str):        # todo check if address to remove and address to add is not same
-        current_addresses = self._get_wifi_global_address()
-        self._remove_current_addresses_from_prefix(current_addresses)
+    """
+    Gets last ocet from mote global address and concatenates it with configured prefix (new wifi global IPv6 address).
+    If new address is same as previously configured address, ends. Else, removes old global IPv6 address. Result sets
+    up as wifi global IPv6 address, sets up routes.
+    """
+    def set_wifi_ipv6_lobal_address(self, mote_global_address: str):
         last_ocet = mote_global_address.split(":")[-1]
         wifi_global_address = str(self._prefix).replace("::", "::{}".format(last_ocet))
+
+        if wifi_global_address == self._data.get_wifi_global_address():
+            return
+
+        current_addresses = self._get_wifi_global_addressees()
+        self._remove_current_addresses_from_prefix(current_addresses)
 
         if wifi_global_address != self._data.get_wifi_global_address():
             self._set_address(wifi_global_address)
             self._data.set_wifi_global_address(wifi_global_address.split("/")[0])
         self._add_route("default")
+
+    def load_wifi_l2_address(self):
+        l2_addr = netifaces.ifaddresses(self._iface)[netifaces.AF_LINK][0]['addr']
+        self._data.set_wifi_l2_address(l2_addr)
 
     def notify(self, event: Event):
         from serial_connection import SettingMoteGlobalAddressEvent

@@ -68,8 +68,7 @@ class Ipv6PacketParser(EventProducer):
                     ask = True
                     self.notify_listeners(RootPacketForwardEvent(contiki_packet))
             if not ask: # arrived packet ro send over WIFI
-                pass
-                 # self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
+                self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
         elif ip[0].dst == self._data.get_wifi_global_address():
             if ip[1].dst == self._data.get_mote_global_address():
                 self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
@@ -77,10 +76,12 @@ class Ipv6PacketParser(EventProducer):
     def _parse_icmpv6_ns(self, packet: Ether):      # refactor - add this to neighbour manager
         target_ip = packet[ICMPv6ND_NS].tgt
         src_ip = packet[IPv6].src
+        src_l2 = packet.src
         if str(self._data.get_mote_global_address()) == target_ip or str(self._data.get_mote_link_local_address()) == target_ip:
             logging.warning('BRIDGE:Sending response to ICMPv6 neighbour solicitation for address "{}"'
                             .format(target_ip))
             self.notify_listeners(MoteNeighbourSolicitationEvent({
+                "src_l2": src_l2,
                 "src_ip": src_ip,
                 "target_ip": target_ip
             }))
@@ -90,7 +91,8 @@ class Ipv6PacketParser(EventProducer):
         src_ip = packet[IPv6].src
         self.notify_listeners(NeighbourAdvertisementEvent({
             "src_ip": src_ip,
-            "target_ip": target_ip
+            "target_ip": target_ip,
+            "src_l2_addr": packet.src
         }))
 
     def parse(self, packet: Ether):
@@ -117,8 +119,10 @@ class PacketSender(EventListener):
     def send_packet(self, packet: str):
         values = packet.split(";")
         dst_ip = None
+        dst_l2 = None
         if self._data.get_mode() == Data.MODE_NODE:
             dst_ip = self._data.get_configuration()['border-router']['ipv6']
+            dst_l2 = "33:33:00:00:00:fb"        # todo check if it is correct
         else:
             node = self._node_table.get_node_address(values[1], 'rpl')
             if node:
@@ -126,8 +130,13 @@ class PacketSender(EventListener):
                 for addr in next_nodes:
                     if next_nodes[addr].get_tech_type() == "wifi":
                         dst_ip = addr
+                        dst_l2 = next_nodes[addr].get_l2_address()
 
-        if dst_ip:
+        if dst_ip and dst_l2:
+            # print("{}{}/{}{}/{}\n".format(self._data.get_wifi_global_address(), dst_ip, values[0], values[1], values[4]))
+            ether = Ether()
+            ether.src = self._data.get_wifi_l2_address()
+            ether.dst = dst_l2
             ip_w = IPv6()
             ip_w.src = self._data.get_wifi_global_address()
             ip_w.dst = dst_ip
@@ -137,28 +146,39 @@ class PacketSender(EventListener):
             udp = UDP()
             udp.sport = int(values[2])
             udp.dport = int(values[3])
-            send(ip_w / ip_r / udp / values[4], verbose=False)
+            try:
+                sendp(ether / ip_w / ip_r / udp / values[4], verbose=False, iface=self.iface)
+            except Exception:
+                packet = ether / ip_w / ip_r / udp / values[4]
+                print(packet.show())
+                raise Exception("end bitch")
             logging.debug('BRIDGE:sending packet using "{}"'.format(self.iface))
         else:
             print("Unknown destination address while packet sending")
 
     def send_icmpv6_ns(self, ip_addr: str):
+        ether = Ether()
+        ether.src = self._data.get_wifi_l2_address()
         ip = IPv6()
         ip.src = self._data.get_wifi_global_address()
         # print("sending icmp using global ip {}".format(self._data.get_wifi_global_address()))
         ip.dst = "ff02::1"
         icmp = ICMPv6ND_NS()
         icmp.tgt = ip_addr
-        send(ip / icmp, verbose=False)
+        sendp(ether / ip / icmp, verbose=False, iface=self.iface)
         logging.debug('BRIDGE:sending neighbour solicitation for target ip "{}"'.format(ip_addr))
 
-    def send_icmpv6_na(self, src_ip: str, target_ip: str):
+    def send_icmpv6_na(self, src_l2: str, src_ip: str, target_ip: str):
+        ether = Ether()
+        ether.src = self._data.get_wifi_l2_address()
+        ether.dst = src_l2
+        # print("sending NA: srcip: {} target_ip:{} global_{}".format(src_ip, target_ip, self._data.get_wifi_global_address()))
         ip = IPv6()
         ip.src = self._data.get_wifi_global_address()
         ip.dst = src_ip
         icmp = ICMPv6ND_NA()
         icmp.tgt = target_ip
-        send(ip / icmp, verbose=False)
+        sendp(ether / ip / icmp, verbose=False, iface=self.iface)
 
     def notify(self, event: Event):
         from serial_connection import SlipPacketToSendEvent

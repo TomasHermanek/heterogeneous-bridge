@@ -94,6 +94,7 @@ class InputParser(EventProducer):
                 (question_id, response) = line[3:].split(";")
             except ValueError:
                 print("Error in line split\n", (line[3:].split(";")))
+                print("Line {}\n".format(line))
                 return
             self.notify_listeners(ResponseToPacketRequest({
                 "question_id": int(question_id),
@@ -200,7 +201,6 @@ class SlipCommands(EventListener):
             self.send_packet_to_contiki(event.get_event())
         elif isinstance(event, PacketBuffEvent):
             self.request_forward_packet_decision(event.get_event()["id"], event.get_event()["packet"])
-
 
     def __str__(self):
         return "slip-commands"

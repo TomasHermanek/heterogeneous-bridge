@@ -8,13 +8,20 @@ import time
 import math
 
 
+def none_to_str(s):
+    if s is None:
+        return ''
+    return str(s)
+
+
 class NodeAddress:
     DEFAULT_LIFETIME = 255
 
-    def __init__(self, ip_address: IPv6Address, tech_type):
+    def __init__(self, ip_address: IPv6Address, tech_type, l2_address=None):
         self._ip_address = ip_address
         self._lifetime = self.DEFAULT_LIFETIME
         self._type = tech_type
+        self._l2_address = l2_address
         self._next_address = {}
 
     def get_ip_address(self) -> IPv6Address:
@@ -25,6 +32,9 @@ class NodeAddress:
             if self._next_address[key].get_tech_type() == tech_type:
                 return True
         return False
+
+    def get_l2_address(self) -> str:
+        return self._l2_address
 
     def get_tech_type(self) -> str:
         return self._type
@@ -55,7 +65,7 @@ class NodeAddress:
         return self._next_address
 
     def __str__(self):
-        return "{:<30}{:<10}[{}]".format(str(self._ip_address), self._lifetime, "".join(
+        return "{:<30}{:<10}{:<25}[{}]".format(str(self._ip_address), self._lifetime, none_to_str(self._l2_address), "".join(
             ["{}({});".format(str(value.get_ip_address()), value.get_tech_type()) for (key, value) in self._next_address.items()]
         ))
 
@@ -131,7 +141,8 @@ class NodeTable(EventProducer):
                     self.remove_node_address_record(node)
 
     def __str__(self):
-        result = "Node Table\n{:<30}{:<10}[{}]\n".format("Dst IP", "Lifetime", "next Ip address(technology);")
+        result = "Node Table\n{:<30}{:<10}{:<25}[{}]\n".format("Dst IP", "Lifetime", "MAC address",
+                                                               "next Ip address(technology);")
         for tech_type in self._types:
             result += "Technology {}: \n{}\n".format(tech_type, "\n".join(
                 ["{}".format(value) for (key, value) in self._nodes[tech_type].items()]
@@ -230,7 +241,8 @@ class NeighborManager(EventListener):
     def notify(self, event: Event):
         from serial_connection import RequestRouteToMoteEvent
         if isinstance(event, MoteNeighbourSolicitationEvent):
-            self._sender.send_icmpv6_na(src_ip=event.get_event()["src_ip"], target_ip=event.get_event()["target_ip"])
+            self._sender.send_icmpv6_na(src_l2=event.get_event()["src_l2"], src_ip=event.get_event()["src_ip"],
+                                        target_ip=event.get_event()["target_ip"])
 
         elif isinstance(event, NewNodeEvent):
             technology = event.get_event().get_tech_type()
@@ -251,6 +263,7 @@ class NeighborManager(EventListener):
         elif isinstance(event, NeighbourAdvertisementEvent):
             src_ip = event.get_event()["src_ip"]
             target_ip = event.get_event()["target_ip"]
+            src_l2_addr = event.get_event()["src_l2_addr"]
             if self._pendings.has_pending(target_ip):
                 pending = self._pendings.get_pending(target_ip)
                 if pending:
@@ -259,7 +272,7 @@ class NeighborManager(EventListener):
 
                 wifi_node_address = self._node_table.get_node_address(src_ip, 'wifi')
                 if not wifi_node_address:
-                    wifi_node_address = NodeAddress(src_ip, 'wifi')
+                    wifi_node_address = NodeAddress(src_ip, 'wifi', src_l2_addr)
                 self._node_table.add_node_address(wifi_node_address)
 
                 mote_node_address = self._node_table.get_node_address(target_ip, 'rpl')

@@ -82,18 +82,24 @@ class Boot(object):
         self._command_listener.add_command(Command("buffer", self._packet_buffer.print_buffer_stats,
                                                    "Shows packet buffer stats"))
 
+    """
+    At first, serial line listeners starts. That allows to handle communication between Linux and Contiki device. After
+    that, wifi l2 address is loaded, default modes is set up, linux sends request for configuration and sets own
+    configuration. Then system waits, while wifi_global address is not set up. Finally, last threads are started.
+    """
     def run(self):
         try:
             self._slip_listener.start()
         except:
             print("Error: unable to start thread")
 
+        self._ip_configurator.load_wifi_l2_address()
         self._data.set_mode(Data.MODE_NODE)
         self._slip_commands.request_config_from_contiki()
         self._slip_commands.send_config_to_contiki()
 
         print("Loading")
-        while not self._data.get_mote_global_address():
+        while not self._data.get_wifi_global_address():
             print(".")
             time.sleep(1)
         print("Configuration loaded, loading listeners")
