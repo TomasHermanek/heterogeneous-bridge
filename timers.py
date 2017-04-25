@@ -1,11 +1,11 @@
 from threading import Thread
-from serial_connection import SlipCommands
+from serial_connection import SerialCommands
 from neighbors import NodeTable
 import time
 
 
 class NeighbourRequestTimer(Thread):
-    def __init__(self, request_time: int, slip_commands: SlipCommands):
+    def __init__(self, request_time: int, slip_commands: SerialCommands):
         Thread.__init__(self)
         self._neighbours_request_time = request_time
         self._slip_commands = slip_commands

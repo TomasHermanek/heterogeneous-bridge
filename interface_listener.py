@@ -4,7 +4,7 @@ from data import Data
 from event_system import EventListener, Event, EventProducer
 
 
-class IncomingPacketSendToSlipEvent(Event):
+class PacketSendToSerialEvent(Event):
     def __init__(self, data: str):
         Event.__init__(self, data)
 
@@ -12,7 +12,7 @@ class IncomingPacketSendToSlipEvent(Event):
         return "incoming-packet-to-slip-event"
 
 
-class MoteNeighbourSolicitationEvent(Event):
+class NeighbourSolicitationEvent(Event):
     def __init__(self, data: dict):
         Event.__init__(self, data)
 
@@ -41,8 +41,8 @@ class Ipv6PacketParser(EventProducer):
         EventProducer.__init__(self)
         self._data = data
         self._node_table = node_table
-        self.add_event_support(IncomingPacketSendToSlipEvent)
-        self.add_event_support(MoteNeighbourSolicitationEvent)
+        self.add_event_support(PacketSendToSerialEvent)
+        self.add_event_support(NeighbourSolicitationEvent)
         self.add_event_support(NeighbourAdvertisementEvent)
         self.add_event_support(RootPacketForwardEvent)
 
@@ -68,10 +68,10 @@ class Ipv6PacketParser(EventProducer):
                     ask = True
                     self.notify_listeners(RootPacketForwardEvent(contiki_packet))
             if not ask: # arrived packet ro send over WIFI
-                self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
+                self.notify_listeners(PacketSendToSerialEvent(contiki_packet))
         elif ip[0].dst == self._data.get_wifi_global_address():
             if ip[1].dst == self._data.get_mote_global_address():
-                self.notify_listeners(IncomingPacketSendToSlipEvent(contiki_packet))
+                self.notify_listeners(PacketSendToSerialEvent(contiki_packet))
 
     def _parse_icmpv6_ns(self, packet: Ether):      # refactor - add this to neighbour manager
         target_ip = packet[ICMPv6ND_NS].tgt
@@ -80,7 +80,7 @@ class Ipv6PacketParser(EventProducer):
         if str(self._data.get_mote_global_address()) == target_ip or str(self._data.get_mote_link_local_address()) == target_ip:
             logging.warning('BRIDGE:Sending response to ICMPv6 neighbour solicitation for address "{}"'
                             .format(target_ip))
-            self.notify_listeners(MoteNeighbourSolicitationEvent({
+            self.notify_listeners(NeighbourSolicitationEvent({
                 "src_l2": src_l2,
                 "src_ip": src_ip,
                 "target_ip": target_ip
@@ -147,6 +147,8 @@ class PacketSender(EventListener):
             udp.sport = int(values[2])
             udp.dport = int(values[3])
             try:
+                # packet = ether / ip_w / ip_r / udp / values[4]
+                # print(packet.show())
                 sendp(ether / ip_w / ip_r / udp / values[4], verbose=False, iface=self.iface)
             except Exception:
                 packet = ether / ip_w / ip_r / udp / values[4]
@@ -181,8 +183,8 @@ class PacketSender(EventListener):
         sendp(ether / ip / icmp, verbose=False, iface=self.iface)
 
     def notify(self, event: Event):
-        from serial_connection import SlipPacketToSendEvent
-        if isinstance(event, SlipPacketToSendEvent):
+        from serial_connection import SerialPacketToSendEvent
+        if isinstance(event, SerialPacketToSendEvent):
             # if not self._data.get_mote_global_address():
             #     logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
             #     return

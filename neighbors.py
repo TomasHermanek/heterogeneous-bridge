@@ -1,6 +1,6 @@
 import logging
 from ipaddress import IPv6Address
-from interface_listener import PacketSender, MoteNeighbourSolicitationEvent, NeighbourAdvertisementEvent
+from interface_listener import PacketSender, NeighbourSolicitationEvent, NeighbourAdvertisementEvent
 from threading import Thread
 from event_system import EventListener, Event, EventProducer
 from data import Data
@@ -240,7 +240,7 @@ class NeighborManager(EventListener):
 
     def notify(self, event: Event):
         from serial_connection import RequestRouteToMoteEvent
-        if isinstance(event, MoteNeighbourSolicitationEvent):
+        if isinstance(event, NeighbourSolicitationEvent):
             self._sender.send_icmpv6_na(src_l2=event.get_event()["src_l2"], src_ip=event.get_event()["src_ip"],
                                         target_ip=event.get_event()["target_ip"])
 

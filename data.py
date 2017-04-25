@@ -15,7 +15,7 @@ class PacketBuffEvent(Event):
 
 class PacketBuffer(EventProducer, EventListener):       # todo create packet buffer maximum limit
     def __init__(self):
-        from serial_connection import SlipPacketToSendEvent
+        from serial_connection import SerialPacketToSendEvent
         self.counter = 1
         self.rpl_sent = 0
         self.wifi_sent = 0
@@ -24,7 +24,7 @@ class PacketBuffer(EventProducer, EventListener):       # todo create packet buf
         EventListener.__init__(self)
         EventProducer.__init__(self)
         self.add_event_support(PacketBuffEvent)
-        self.add_event_support(SlipPacketToSendEvent)
+        self.add_event_support(SerialPacketToSendEvent)
 
     def add_packet(self, packet: str):
         self._packets.update({
@@ -37,10 +37,11 @@ class PacketBuffer(EventProducer, EventListener):       # todo create packet buf
         self.counter += 1
 
     def handle_packet(self, id: int, response: bool):
-        from serial_connection import SlipPacketToSendEvent
+        from serial_connection import SerialPacketToSendEvent
         if id in self._packets:
             if response:
-                self.notify_listeners(SlipPacketToSendEvent(self._packets[id]))
+                print("sending wifi")
+                self.notify_listeners(SerialPacketToSendEvent(self._packets[id]))
                 self.wifi_sent += 1
             else:
                 self.rpl_sent += 1
@@ -196,8 +197,8 @@ class IpConfigurator(EventListener):
         self._data.set_wifi_l2_address(l2_addr)
 
     def notify(self, event: Event):
-        from serial_connection import SettingMoteGlobalAddressEvent
-        if isinstance(event, SettingMoteGlobalAddressEvent):
+        from serial_connection import MoteGlobalAddressEvent
+        if isinstance(event, MoteGlobalAddressEvent):
             self.set_wifi_ipv6_lobal_address(event.get_event())
         elif isinstance(event, ChangeModeEvent):
             mode = event.get_event()

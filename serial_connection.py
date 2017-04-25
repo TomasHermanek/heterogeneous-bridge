@@ -15,7 +15,7 @@ class ContikiBootEvent(Event):
         return "contiki-boot-event"
 
 
-class SlipPacketToSendEvent(Event):
+class SerialPacketToSendEvent(Event):
     def __init__(self, data: str):
         Event.__init__(self, data)
 
@@ -23,7 +23,7 @@ class SlipPacketToSendEvent(Event):
         return "slip-packet-to-send-event"
 
 
-class SettingMoteGlobalAddressEvent(Event):
+class MoteGlobalAddressEvent(Event):
     def __init__(self, data: str):
         Event.__init__(self, data)
         logging.info('BRIDGE: contiki uses global IPv6 address "{}"'.format(data))
@@ -63,8 +63,8 @@ class SerialParser(EventProducer):
         self._data = data
         self._node_table = node_table
         self.add_event_support(ContikiBootEvent)
-        self.add_event_support(SlipPacketToSendEvent)
-        self.add_event_support(SettingMoteGlobalAddressEvent)
+        self.add_event_support(SerialPacketToSendEvent)
+        self.add_event_support(MoteGlobalAddressEvent)
         self.add_event_support(RequestRouteToMoteEvent)
         self.add_event_support(ResponseToPacketRequest)
         self._reading_print = False
@@ -86,7 +86,7 @@ class SerialParser(EventProducer):
                     ipadress_obj = ipaddress.ip_address(address)
                     if ipadress_obj.is_global:
                         self._data.set_mote_global_address(address)
-                        self.notify_listeners(SettingMoteGlobalAddressEvent(address))
+                        self.notify_listeners(MoteGlobalAddressEvent(address))
                     elif ipadress_obj.is_link_local:
                         self._data.set_mote_link_local_address(address)
         # asking if device is possible to deliver packet using wifi
@@ -110,7 +110,7 @@ class SerialParser(EventProducer):
                 "response": True if values[1] == "1" else False
             }))
         elif line[:2] == b'!p':
-            self.notify_listeners(SlipPacketToSendEvent(line[3:-1].decode("utf-8")))
+            self.notify_listeners(SerialPacketToSendEvent(line[3:-1].decode("utf-8")))
             logging.debug('BRIDGE:incoming packet to send')
         elif line[:2] == b'!b':
             self.notify_listeners(ContikiBootEvent(line))
@@ -135,7 +135,7 @@ class SerialParser(EventProducer):
             logging.debug('CONTIKI:{}'.format(line))
 
 
-class SlipListener(Thread):
+class SerialListener(Thread):
     """
     This thread is responsible for creating connection over serial line. After that, each received line is passed to
     SerialParser for handle data.
@@ -158,7 +158,7 @@ class SlipListener(Thread):
                 self._serial_parser.parse(line)
 
 
-class SlipSender:
+class SerialSender:
     def __init__(self, device: str):
         self._ser = serial.Serial(port=device, baudrate=115200, parity=serial.PARITY_NONE,
                                   stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=0)
@@ -167,8 +167,8 @@ class SlipSender:
         self._ser.write(msg)
 
 
-class SlipCommands(EventListener):
-    def __init__(self, slip_sender: SlipSender, data: Data):
+class SerialCommands(EventListener):
+    def __init__(self, slip_sender: SerialSender, data: Data):
         self._slip_sender = slip_sender
         self._data = data
 
@@ -210,11 +210,11 @@ class SlipCommands(EventListener):
         logging.debug('BRIDGE:sending packet to contiki')
 
     def notify(self, event: Event):
-        from interface_listener import IncomingPacketSendToSlipEvent
+        from interface_listener import PacketSendToSerialEvent
         from data import PacketBuffEvent
         if isinstance(event, ContikiBootEvent):
             self.send_config_to_contiki()
-        elif isinstance(event, IncomingPacketSendToSlipEvent):
+        elif isinstance(event, PacketSendToSerialEvent):
             self.send_packet_to_contiki(event.get_event())
         elif isinstance(event, PacketBuffEvent):
             self.request_forward_packet_decision(event.get_event()["id"], event.get_event()["packet"])
