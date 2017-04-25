@@ -2,7 +2,7 @@ from serial_connection import SerialListener, SerialSender, ContikiBootEvent, Se
     SerialParser, MoteGlobalAddressEvent, RequestRouteToMoteEvent, ResponseToPacketRequest
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, PacketSendToSerialEvent, PacketSender, \
-    NeighbourSolicitationEvent, NeighbourAdvertisementEvent, RootPacketForwardEvent
+    NeighbourSolicitationEvent, NeighbourAdvertisementEvent, RootPacketForwardEvent, PacketForwardToSerialEvent
 from neighbors import PendingSolicitations, NewNodeEvent, NodeTable, NodeRefreshEvent
 from utils.configuration_loader import ConfigurationLoader
 from data import Data, IpConfigurator, ChangeModeEvent, PacketBuffer, PacketBuffEvent
@@ -59,6 +59,8 @@ class Boot(object):
         self._packet_buffer.subscribe_event(SerialPacketToSendEvent, self._packed_sender)
         self._input_parser.subscribe_event(SerialPacketToSendEvent, self._packed_sender)
         self._interface_listener.get_ipv6_packet_parser().subscribe_event(PacketSendToSerialEvent,
+                                                                          self._slip_commands)
+        self._interface_listener.get_ipv6_packet_parser().subscribe_event(PacketForwardToSerialEvent,
                                                                           self._slip_commands)
         self._node_table.subscribe_event(NewNodeEvent, self._neighbour_manager)
         self._node_table.subscribe_event(NodeRefreshEvent, self._neighbour_manager)

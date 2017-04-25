@@ -40,7 +40,6 @@ class PacketBuffer(EventProducer, EventListener):       # todo create packet buf
         from serial_connection import SerialPacketToSendEvent
         if id in self._packets:
             if response:
-                print("sending wifi")
                 self.notify_listeners(SerialPacketToSendEvent(self._packets[id]))
                 self.wifi_sent += 1
             else:

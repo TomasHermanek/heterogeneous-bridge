@@ -12,6 +12,14 @@ class PacketSendToSerialEvent(Event):
         return "incoming-packet-to-slip-event"
 
 
+class PacketForwardToSerialEvent(Event):
+    def __init__(self, data: str):
+        Event.__init__(self, data)
+
+    def __str__(self):
+        return "packet-forward-to-serial-event"
+
+
 class NeighbourSolicitationEvent(Event):
     def __init__(self, data: dict):
         Event.__init__(self, data)
@@ -45,6 +53,7 @@ class Ipv6PacketParser(EventProducer):
         self.add_event_support(NeighbourSolicitationEvent)
         self.add_event_support(NeighbourAdvertisementEvent)
         self.add_event_support(RootPacketForwardEvent)
+        self.add_event_support(PacketForwardToSerialEvent)
 
     """
     Packed sent from another mote via WIFI must contains two IP headers, first one is used by internal WIFI, but second
@@ -66,9 +75,11 @@ class Ipv6PacketParser(EventProducer):
             for key in next_nodes:
                 if next_nodes[key].get_tech_type() == "wifi":
                     ask = True
+                    # ask for forward decision (I have route to mote using wifi too)
                     self.notify_listeners(RootPacketForwardEvent(contiki_packet))
-            if not ask: # arrived packet ro send over WIFI
-                self.notify_listeners(PacketSendToSerialEvent(contiki_packet))
+            if not ask:
+                # forwarding packet using RPL (I don't have route to mote using wifi)
+                self.notify_listeners(PacketForwardToSerialEvent(contiki_packet))
         elif ip[0].dst == self._data.get_wifi_global_address():
             if ip[1].dst == self._data.get_mote_global_address():
                 self.notify_listeners(PacketSendToSerialEvent(contiki_packet))

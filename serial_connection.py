@@ -209,13 +209,19 @@ class SerialCommands(EventListener):
         self._slip_sender.send(str.encode("!p;{}\n".format(raw_packet)))
         logging.debug('BRIDGE:sending packet to contiki')
 
+    def forward_packet_to_contiki(self, raw_packet: str):
+        self._slip_sender.send(str.encode("!f;{}\n".format(raw_packet)))
+        logging.debug('BRIDGE:forwarding packet to contiki')
+
     def notify(self, event: Event):
-        from interface_listener import PacketSendToSerialEvent
+        from interface_listener import PacketSendToSerialEvent, PacketForwardToSerialEvent
         from data import PacketBuffEvent
         if isinstance(event, ContikiBootEvent):
             self.send_config_to_contiki()
         elif isinstance(event, PacketSendToSerialEvent):
             self.send_packet_to_contiki(event.get_event())
+        elif isinstance(event, PacketForwardToSerialEvent):
+            self.forward_packet_to_contiki(event.get_event())
         elif isinstance(event, PacketBuffEvent):
             self.request_forward_packet_decision(event.get_event()["id"], event.get_event()["packet"])
 
