@@ -76,10 +76,10 @@ class SerialParser(EventProducer):
         elif line[:2] == b'->':
             self._reading_print = False
         elif self._reading_print:
-            print(line.decode("utf-8")[:-1])
+            print(line.decode("UTF-8", "ignore")[:-1])
         # sends contiki addresses
         elif line[:2] == b'!r':
-            line = line.decode("utf-8")
+            line = line.decode("UTF-8", "ignore")
             addresses = line[2:-1].split(';')
             for address in addresses:
                 if address != "":
@@ -91,14 +91,14 @@ class SerialParser(EventProducer):
                         self._data.set_mote_link_local_address(address)
         # asking if device is possible to deliver packet using wifi
         elif line[:2] == b'?p':
-            line = line.decode("utf-8")
+            line = line.decode("UTF-8", "ignore")
             (question_id, ip_addr) = line[3:-1].split(";")
             self.notify_listeners(RequestRouteToMoteEvent({
                 "question_id": question_id,
                 "ip_addr": ip_addr
             }))
         elif line[:2] == b'$p':
-            line = line.decode("utf-8")
+            line = line.decode("UTF-8", "ignore")
             try:
                 values = line[3:].split(";")
             except ValueError:
@@ -110,7 +110,8 @@ class SerialParser(EventProducer):
                 "response": True if values[1] == "1" else False
             }))
         elif line[:2] == b'!p':
-            self.notify_listeners(SerialPacketToSendEvent(line[3:-1].decode("utf-8")))
+            print(line)
+            self.notify_listeners(SerialPacketToSendEvent(line[3:-1].decode("UTF-8", "ignore")))
             logging.debug('BRIDGE:incoming packet to send')
         elif line[:2] == b'!b':
             self.notify_listeners(ContikiBootEvent(line))
@@ -119,7 +120,7 @@ class SerialParser(EventProducer):
             self._data.set_mode(int(line[2:-1]))
             logging.info('BRIDGE:bridge runs in mode {}'.format(line[2:-1]))
         elif line[:2] == b'!n':
-            line = line.decode("utf-8")
+            line = line.decode("UTF-8", "ignore")
             nodes = line[2:-1].split(';')
             for node in nodes:
                 if node != "":

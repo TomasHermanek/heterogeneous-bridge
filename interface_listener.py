@@ -66,7 +66,7 @@ class Ipv6PacketParser(EventProducer):
         src_addr = ipaddress.ip_address(ip[1].src)
         dst_addr = ipaddress.ip_address(ip[1].dst)
         contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport,
-                                                 raw.load.decode("utf-8"))
+                                                 raw.load.decode("UTF-8", "ignore"))
 
         if self._data.get_mode() == Data.MODE_ROOT and ip[0].dst == self._data.get_configuration()['border-router']['ipv6']:
             ask = False
@@ -200,7 +200,7 @@ class PacketSender(EventListener):
             #     logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
             #     return
             # packet_to_send = event.get_event()
-            # packet_to_send_decoded = packet_to_send[3:-1].decode("utf-8")
+            # packet_to_send_decoded = packet_to_send[3:-1].decode("UTF-8", "ignore")
             self.send_packet(event.get_event())
 
     def __str__(self):
