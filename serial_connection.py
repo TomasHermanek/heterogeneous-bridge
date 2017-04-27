@@ -17,7 +17,7 @@ class ContikiBootEvent(Event):
 
 
 class SerialPacketToSendEvent(Event):
-    def __init__(self, data: str):
+    def __init__(self, data: ContikiPacket):
         Event.__init__(self, data)
 
     def __str__(self):
@@ -143,7 +143,7 @@ class SerialListener(Thread):
     This thread is responsible for creating connection over serial line. After that, each received line is passed to
     SerialParser for handle data.
     """
-    def __init__(self, device: str, data: Data, serial_parser: SerialParser):
+    def __init__(self, device: str, serial_parser: SerialParser):
         Thread.__init__(self)
         self._device = device
         self._serial_parser = serial_parser
@@ -168,6 +168,7 @@ class SerialSender:
 
     def send(self, msg: bytes):
         self._ser.write(msg)
+        # print(msg)
 
 
 class SerialCommands(EventListener):
@@ -203,17 +204,17 @@ class SerialCommands(EventListener):
         self._slip_sender.send(b'?n\n')
         logging.info('BRIDGE:requesting neighbours from contiki')
 
-    def request_forward_packet_decision(self, id: int, raw_packet: str):
-        self._slip_sender.send(str.encode("?p;{};{}\n".format(id, raw_packet)))
+    def request_forward_packet_decision(self, id: int, contiki_packet: ContikiPacket):
+        self._slip_sender.send(str.encode("?p;{};{}\n".format(id, contiki_packet.get_contiki_format())))
         # print("sending: {}\n".format("?p;{};{}\n".format(id, raw_packet)))
         logging.info('BRIDGE:requesting forward decision')
 
-    def send_packet_to_contiki(self, raw_packet: str):
-        self._slip_sender.send(str.encode("!p;{}\n".format(raw_packet)))
+    def send_packet_to_contiki(self, contiki_packet: ContikiPacket):
+        self._slip_sender.send(str.encode("!p;{}\n".format(contiki_packet.get_contiki_format())))
         logging.debug('BRIDGE:sending packet to contiki')
 
-    def forward_packet_to_contiki(self, raw_packet: str):
-        self._slip_sender.send(str.encode("!f;{}\n".format(raw_packet)))
+    def forward_packet_to_contiki(self, contiki_packet: ContikiPacket):
+        self._slip_sender.send(str.encode("!f;{}\n".format(contiki_packet.get_contiki_format())))
         logging.debug('BRIDGE:forwarding packet to contiki')
 
     def notify(self, event: Event):

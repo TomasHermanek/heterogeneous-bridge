@@ -3,6 +3,7 @@ import netifaces
 import os
 from ipaddress import IPv6Address, IPv6Network, AddressValueError
 from event_system import EventProducer, Event, EventListener
+from packet import ContikiPacket
 
 
 class PacketBuffEvent(Event):
@@ -26,11 +27,11 @@ class PacketBuffer(EventProducer, EventListener):       # todo create packet buf
         self.add_event_support(PacketBuffEvent)
         self.add_event_support(SerialPacketToSendEvent)
 
-    def add_packet(self, packet: str):
+    def add_packet(self, packet: ContikiPacket):
         self._packets.update({
             self.counter: packet
         })
-        self.notify_listeners(PacketBuffEvent({
+        self.notify_listeners(PacketBuffEvent({     # todo change this
             "id": self.counter,
             "packet": packet
         }))

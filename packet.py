@@ -1,4 +1,5 @@
 from scapy.all import *
+import ipaddress
 
 
 class ContikiPacket:
@@ -20,6 +21,14 @@ class ContikiPacket:
         packet[UDP].payload = bytes.fromhex(values[4].decode("UTF-8"))
         return packet
 
+    @staticmethod
+    def scapy_to_contiki(scapy_format):
+        udp = scapy_format[UDP]
+        raw = ''.join('{:02x}'.format(x) for x in bytes(scapy_format[UDP].payload))
+        src_addr = ipaddress.ip_address(scapy_format[IPv6][1].src)
+        dst_addr = ipaddress.ip_address(scapy_format[IPv6][1].dst)
+        return "{};{};{};{};{}".format(src_addr, dst_addr, udp.sport, udp.dport, raw)
+
     def set_contiki_format(self, raw_str: str):
         self._contiki_format = raw_str
 
@@ -27,6 +36,8 @@ class ContikiPacket:
         self._scapy_format = packet
 
     def get_contiki_format(self):
+        if not self._contiki_format:
+            self._contiki_format = self.scapy_to_contiki(self._scapy_format)
         return self._contiki_format
 
     def get_scapy_format(self):

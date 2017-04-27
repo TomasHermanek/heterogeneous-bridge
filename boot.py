@@ -39,8 +39,7 @@ class Boot(object):
         self._pending_solicitations = PendingSolicitations()
         self._slip_sender = SerialSender(self._data.get_configuration()['serial']['device'])
         self._input_parser = SerialParser(self._data, self._node_table)
-        self._slip_listener = SerialListener(self._data.get_configuration()['serial']['device'], self._data,
-                                             self._input_parser)
+        self._slip_listener = SerialListener(self._data.get_configuration()['serial']['device'], self._input_parser)
         self._packet_parser = Ipv6PacketParser(self._data, self._node_table)
         self._interface_listener = InterfaceListener(self._data.get_configuration()['wifi']['device'], self._packet_parser)
         self._slip_commands = SerialCommands(self._slip_sender, self._data)

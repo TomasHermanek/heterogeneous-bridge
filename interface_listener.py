@@ -3,10 +3,11 @@ from scapy.all import *
 from data import Data
 from event_system import EventListener, Event, EventProducer
 from packet import ContikiPacket
+import ipaddress
 
 
 class PacketSendToSerialEvent(Event):
-    def __init__(self, data: str):
+    def __init__(self, data: ContikiPacket):
         Event.__init__(self, data)
 
     def __str__(self):
@@ -14,7 +15,7 @@ class PacketSendToSerialEvent(Event):
 
 
 class PacketForwardToSerialEvent(Event):
-    def __init__(self, data: str):
+    def __init__(self, data: ContikiPacket):
         Event.__init__(self, data)
 
     def __str__(self):
@@ -38,7 +39,7 @@ class NeighbourAdvertisementEvent(Event):
 
 
 class RootPacketForwardEvent(Event):
-    def __init__(self, data: str):
+    def __init__(self, data: ContikiPacket):
         Event.__init__(self, data)
 
     def __str__(self):
@@ -61,18 +62,23 @@ class Ipv6PacketParser(EventProducer):
     one contains motes global IPv6 address
     """
     def _parse_udp(self, packet: Ether):
+        contiki_packet = ContikiPacket()
+        contiki_packet.set_scapy_format(packet)
+
         ip = packet[IPv6]
         udp = packet[UDP]
         raw = packet[Raw]
         src_addr = ipaddress.ip_address(ip[1].src)
         dst_addr = ipaddress.ip_address(ip[1].dst)
-        contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport,
-                                                 raw.load.decode("UTF-8", "ignore"))
-        print(contiki_packet)
-        return
+        # contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport,
+        #                                          raw.load.decode("UTF-8", "ignore"))
+        # print(contiki_packet.get_contiki_format())
+
         if self._data.get_mode() == Data.MODE_ROOT and ip[0].dst == self._data.get_configuration()['border-router']['ipv6']:
             ask = False
             node_address = self._node_table.get_node_address(ip[1].dst, 'rpl')
+            if not node_address:
+                logging.warning('BRIDGE:Mote not exists "{}"'.format(ip[1].dst))
             next_nodes = node_address.get_node_addresses()
             for key in next_nodes:
                 if next_nodes[key].get_tech_type() == "wifi":
@@ -81,7 +87,6 @@ class Ipv6PacketParser(EventProducer):
                     self.notify_listeners(RootPacketForwardEvent(contiki_packet))
             if not ask:
                 # forwarding packet using RPL (I don't have route to mote using wifi)
-                print("here bitch")
                 self.notify_listeners(PacketForwardToSerialEvent(contiki_packet))
         elif ip[0].dst == self._data.get_wifi_global_address():
             if ip[1].dst == self._data.get_mote_global_address():
