@@ -2,6 +2,7 @@ from threading import Thread
 from data import Data
 from neighbors import NodeAddress, NodeTable
 from event_system import EventProducer, Event, EventListener
+from packet import ContikiPacket
 import logging
 import serial
 import ipaddress
@@ -110,8 +111,9 @@ class SerialParser(EventProducer):
                 "response": True if values[1] == "1" else False
             }))
         elif line[:2] == b'!p':
-            print(line)
-            self.notify_listeners(SerialPacketToSendEvent(line[3:-1].decode("UTF-8", "ignore")))
+            contiki_packet = ContikiPacket()
+            contiki_packet.set_contiki_format(line[3:-1])
+            self.notify_listeners(SerialPacketToSendEvent(contiki_packet))
             logging.debug('BRIDGE:incoming packet to send')
         elif line[:2] == b'!b':
             self.notify_listeners(ContikiBootEvent(line))

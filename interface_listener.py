@@ -2,6 +2,7 @@ from threading import Thread
 from scapy.all import *
 from data import Data
 from event_system import EventListener, Event, EventProducer
+from packet import ContikiPacket
 
 
 class PacketSendToSerialEvent(Event):
@@ -67,7 +68,8 @@ class Ipv6PacketParser(EventProducer):
         dst_addr = ipaddress.ip_address(ip[1].dst)
         contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport,
                                                  raw.load.decode("UTF-8", "ignore"))
-
+        print(contiki_packet)
+        return
         if self._data.get_mode() == Data.MODE_ROOT and ip[0].dst == self._data.get_configuration()['border-router']['ipv6']:
             ask = False
             node_address = self._node_table.get_node_address(ip[1].dst, 'rpl')
@@ -79,6 +81,7 @@ class Ipv6PacketParser(EventProducer):
                     self.notify_listeners(RootPacketForwardEvent(contiki_packet))
             if not ask:
                 # forwarding packet using RPL (I don't have route to mote using wifi)
+                print("here bitch")
                 self.notify_listeners(PacketForwardToSerialEvent(contiki_packet))
         elif ip[0].dst == self._data.get_wifi_global_address():
             if ip[1].dst == self._data.get_mote_global_address():
@@ -127,15 +130,18 @@ class PacketSender(EventListener):
         self._data = data
         self._node_table = node_table
 
-    def send_packet(self, packet: str):
-        values = packet.split(";")
+    def send_packet(self, packet: ContikiPacket):
+        # values = packet.split(b";")
+
+        # print(contiki_packet.get_contiki_format())
+        packet = packet.get_scapy_format()
         dst_ip = None
         dst_l2 = None
         if self._data.get_mode() == Data.MODE_NODE:
             dst_ip = self._data.get_configuration()['border-router']['ipv6']
             dst_l2 = "33:33:00:00:00:fb"        # todo check if it is correct
         else:
-            node = self._node_table.get_node_address(values[1], 'rpl')
+            node = self._node_table.get_node_address(packet[IPv6][1].dst, 'rpl')
             if node:
                 next_nodes = node.get_node_addresses()
                 for addr in next_nodes:
@@ -145,24 +151,28 @@ class PacketSender(EventListener):
 
         if dst_ip and dst_l2:
             # print("{}{}/{}{}/{}\n".format(self._data.get_wifi_global_address(), dst_ip, values[0], values[1], values[4]))
-            ether = Ether()
-            ether.src = self._data.get_wifi_l2_address()
-            ether.dst = dst_l2
-            ip_w = IPv6()
-            ip_w.src = self._data.get_wifi_global_address()
-            ip_w.dst = dst_ip
-            ip_r = IPv6()
-            ip_r.src = values[0]
-            ip_r.dst = values[1]
-            udp = UDP()
-            udp.sport = int(values[2])
-            udp.dport = int(values[3])
+            # ether = Ether()
+            # ether.src = self._data.get_wifi_l2_address()
+            # ether.dst = dst_l2
+            # ip_w = IPv6()
+            # ip_w.src = self._data.get_wifi_global_address()
+            # ip_w.dst = dst_ip
+            # ip_r = IPv6()
+            # ip_r.src = values[0].decode("UTF-8")
+            # ip_r.dst = values[1].decode("UTF-8")
+            # udp = UDP()
+            # udp.sport = int(values[2].decode("UTF-8"))
+            # udp.dport = int(values[3].decode("UTF-8"))
+
+            packet[Ether].src = self._data.get_wifi_l2_address()
+            packet[Ether].dst = dst_l2
+            packet[IPv6][0].src = self._data.get_wifi_global_address()
+            packet[IPv6][0].dst = dst_ip
             try:
                 # packet = ether / ip_w / ip_r / udp / values[4]
                 # print(packet.show())
-                sendp(ether / ip_w / ip_r / udp / values[4], verbose=False, iface=self.iface)
+                sendp(packet, verbose=False, iface=self.iface)
             except Exception:
-                packet = ether / ip_w / ip_r / udp / values[4]
                 print(packet.show())
                 raise Exception("end bitch")
             logging.debug('BRIDGE:sending packet using "{}"'.format(self.iface))
