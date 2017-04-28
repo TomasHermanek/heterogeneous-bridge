@@ -6,7 +6,7 @@ from interface_listener import InterfaceListener, Ipv6PacketParser, PacketSendTo
 from neighbors import PendingSolicitations, NewNodeEvent, NodeTable, NodeRefreshEvent
 from utils.configuration_loader import ConfigurationLoader
 from data import Data, IpConfigurator, ChangeModeEvent, PacketBuffer, PacketBuffEvent
-from neighbors import NeighborManager
+from neighbors import NeighborManager, PendingEntry
 from command_listener import CommandListener, Command
 import configparser
 import os
@@ -113,6 +113,9 @@ class Boot(object):
             self._command_listener.start()
         except:
             print("Error: unable to start thread")
+        if self._data.get_mode() == Data.MODE_NODE:
+            self._pending_solicitations.add_pending(self._data.get_configuration()['border-router']['ipv6'],
+                                                    self._packed_sender.send_icmpv6_ns)
         while 1:
             pass
 

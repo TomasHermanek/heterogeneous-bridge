@@ -84,6 +84,7 @@ class Data(EventProducer):
         self._mote_link_local_address = None
         self._wifi_global_address = None
         self._wifi_l2_address = None
+        self._border_router_l2_address = None
         self._mode = None
         self._configuration = configuration
 

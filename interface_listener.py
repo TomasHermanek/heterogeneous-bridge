@@ -96,7 +96,9 @@ class Ipv6PacketParser(EventProducer):
         target_ip = packet[ICMPv6ND_NS].tgt
         src_ip = packet[IPv6].src
         src_l2 = packet.src
-        if str(self._data.get_mote_global_address()) == target_ip or str(self._data.get_mote_link_local_address()) == target_ip:
+        # i I am root and solicitation wants to get root address or solicitation wants my mote address
+        if (self._data.get_mode() == Data.MODE_ROOT and self._data.get_configuration()['border-router']['ipv6'] == target_ip)\
+                or (str(self._data.get_mote_global_address()) == target_ip or str(self._data.get_mote_link_local_address()) == target_ip):
             logging.warning('BRIDGE:Sending response to ICMPv6 neighbour solicitation for address "{}"'
                             .format(target_ip))
             self.notify_listeners(NeighbourSolicitationEvent({
