@@ -6,6 +6,8 @@ class ContikiPacket:
     """
     Valid contiki_packet format is: <src_ip>;<dst_ip>;<src_port>;<dst_port>;<payload>
     """
+    COAP_PORT = 5683
+
     def __init__(self):
         self._contiki_format = None
         self._scapy_format = None
@@ -16,8 +18,10 @@ class ContikiPacket:
         packet = Ether() / IPv6() / IPv6() / UDP()
         packet[IPv6][1].src = values[0].decode("UTF-8")
         packet[IPv6][1].dst = values[1].decode("UTF-8")
-        packet[UDP].sport = int(values[2].decode("UTF-8"))
-        packet[UDP].dport = int(values[3].decode("UTF-8"))
+        # packet[UDP].sport = int(values[2].decode("UTF-8"))
+        # packet[UDP].dport = int(values[3].decode("UTF-8"))
+        packet[UDP].sport = ContikiPacket.COAP_PORT
+        packet[UDP].dport = ContikiPacket.COAP_PORT
         packet[UDP].payload = bytes.fromhex(values[4].decode("UTF-8"))
         return packet
 
