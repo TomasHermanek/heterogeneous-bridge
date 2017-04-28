@@ -88,6 +88,12 @@ class Data(EventProducer):
         self._mode = None
         self._configuration = configuration
 
+    def set_border_router_l2_address(self, border_router_l2):
+        self._border_router_l2_address = border_router_l2
+
+    def get_border_router_l2_address(self):
+        return self._border_router_l2_address
+
     def set_mode(self, mode: int):
         if (mode == self.MODE_NODE or mode == self.MODE_ROOT) and mode != self._mode:
             self._mode = mode
@@ -124,9 +130,10 @@ class Data(EventProducer):
         return self._mode
 
     def print_data(self):
-        print('Bridge mode: {}\nMote global IP: {:>30}\nMote local IP: {:>30}\nWifi global IP: {:>30}\nWifi MAC{:>30}\n'.
-              format("ROOT" if self._mode == self.MODE_ROOT else "NODE", self._mote_global_address,
-                     self._mote_link_local_address, self._wifi_global_address, self._wifi_l2_address))
+        print('Bridge mode: {}\nMote global IP: {:>30}\nMote local IP: {:>30}\nWifi global IP: {:>30}\nWifi MAC{:>30}\n'
+              'Root MAC{:>30}\n'.format("ROOT" if self._mode == self.MODE_ROOT else "NODE", self._mote_global_address,
+                                        self._mote_link_local_address, self._wifi_global_address, self._wifi_l2_address,
+                                        self._border_router_l2_address if self._border_router_l2_address else "None"))
 
 
 class IpConfigurator(EventListener):

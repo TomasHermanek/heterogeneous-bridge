@@ -138,15 +138,15 @@ class PacketSender(EventListener):
         self._node_table = node_table
 
     def send_packet(self, packet: ContikiPacket):
-        # values = packet.split(b";")
-
-        # print(contiki_packet.get_contiki_format())
         packet = packet.get_scapy_format()
         dst_ip = None
         dst_l2 = None
         if self._data.get_mode() == Data.MODE_NODE:
             dst_ip = self._data.get_configuration()['border-router']['ipv6']
-            dst_l2 = "33:33:00:00:00:fb"        # todo check if it is correct
+            if self._data.get_border_router_l2_address():
+                dst_l2 = self._data.get_border_router_l2_address()
+            else:
+                dst_l2 = "33:33:00:00:00:fb"        # todo check if it is correct
         else:
             node = self._node_table.get_node_address(packet[IPv6][1].dst, 'rpl')
             if node:
@@ -157,20 +157,6 @@ class PacketSender(EventListener):
                         dst_l2 = next_nodes[addr].get_l2_address()
 
         if dst_ip and dst_l2:
-            # print("{}{}/{}{}/{}\n".format(self._data.get_wifi_global_address(), dst_ip, values[0], values[1], values[4]))
-            # ether = Ether()
-            # ether.src = self._data.get_wifi_l2_address()
-            # ether.dst = dst_l2
-            # ip_w = IPv6()
-            # ip_w.src = self._data.get_wifi_global_address()
-            # ip_w.dst = dst_ip
-            # ip_r = IPv6()
-            # ip_r.src = values[0].decode("UTF-8")
-            # ip_r.dst = values[1].decode("UTF-8")
-            # udp = UDP()
-            # udp.sport = int(values[2].decode("UTF-8"))
-            # udp.dport = int(values[3].decode("UTF-8"))
-
             packet[Ether].src = self._data.get_wifi_l2_address()
             packet[Ether].dst = dst_l2
             packet[IPv6][0].src = self._data.get_wifi_global_address()

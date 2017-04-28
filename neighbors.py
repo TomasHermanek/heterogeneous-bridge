@@ -264,20 +264,23 @@ class NeighborManager(EventListener):
             src_ip = event.get_event()["src_ip"]
             target_ip = event.get_event()["target_ip"]
             src_l2_addr = event.get_event()["src_l2_addr"]
+
             if self._pendings.has_pending(target_ip):
                 pending = self._pendings.get_pending(target_ip)
                 if pending:
                     pending.set_status(PendingEntry.STATUS_SUCCESS)
-                # self._pendings.remove_pending(target_ip)
+                # response to NS for border router
+                if self._data.get_configuration()['border-router']['ipv6'] == target_ip:
+                    self._data.set_border_router_l2_address(src_l2_addr)
+                else:
+                    wifi_node_address = self._node_table.get_node_address(src_ip, 'wifi')
+                    if not wifi_node_address:
+                        wifi_node_address = NodeAddress(src_ip, 'wifi', src_l2_addr)
+                    self._node_table.add_node_address(wifi_node_address)
 
-                wifi_node_address = self._node_table.get_node_address(src_ip, 'wifi')
-                if not wifi_node_address:
-                    wifi_node_address = NodeAddress(src_ip, 'wifi', src_l2_addr)
-                self._node_table.add_node_address(wifi_node_address)
-
-                mote_node_address = self._node_table.get_node_address(target_ip, 'rpl')
-                if mote_node_address:
-                    mote_node_address.add_next_node_address(wifi_node_address)
+                    mote_node_address = self._node_table.get_node_address(target_ip, 'rpl')
+                    if mote_node_address:
+                        mote_node_address.add_next_node_address(wifi_node_address)
         elif isinstance(event, RequestRouteToMoteEvent):
             node = self._node_table.get_node_address(event.get_event()["ip_addr"], 'rpl')
             if node and node.has_neighbor_with_tech('wifi'):
