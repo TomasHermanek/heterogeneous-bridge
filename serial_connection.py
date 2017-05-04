@@ -112,7 +112,8 @@ class SerialParser(EventProducer):
             }))
         elif line[:2] == b'!p':
             contiki_packet = ContikiPacket()
-            contiki_packet.set_contiki_format(line[3:-1])
+            contiki_packet.set_contiki_format(line[3:-1].decode("UTF-8"))
+            # print(contiki_packet.get_contiki_format())
             self.notify_listeners(SerialPacketToSendEvent(contiki_packet))
             logging.debug('BRIDGE:incoming packet to send')
         elif line[:2] == b'!b':

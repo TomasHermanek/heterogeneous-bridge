@@ -122,6 +122,7 @@ class Ipv6PacketParser(EventProducer):
             return
         if IPv6 in packet and UDP in packet:
             try:
+                packet[IPv6][1].dst
                 self._parse_udp(packet)
             except Exception as e:
                 logging.error('BRIDGE:{}'.format(str(e)))
@@ -137,8 +138,8 @@ class PacketSender(EventListener):
         self._data = data
         self._node_table = node_table
 
-    def send_packet(self, packet: ContikiPacket):
-        packet = packet.get_scapy_format()
+    def send_packet(self, contiki_packet: ContikiPacket):
+        packet = contiki_packet.get_scapy_format()
         dst_ip = None
         dst_l2 = None
         if self._data.get_mode() == Data.MODE_NODE:
@@ -164,6 +165,7 @@ class PacketSender(EventListener):
             try:
                 # packet = ether / ip_w / ip_r / udp / values[4]
                 # print(packet.show())
+                # print("packet contiki format {}\n".format(contiki_packet.get_contiki_format()))
                 sendp(packet, verbose=False, iface=self.iface)
             except Exception:
                 print(packet.show())
