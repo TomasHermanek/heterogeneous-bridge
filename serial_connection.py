@@ -7,6 +7,8 @@ import logging
 import serial
 import ipaddress
 
+import time
+
 
 class ContikiBootEvent(Event):
     def __init__(self, line: str):
@@ -78,6 +80,24 @@ class SerialParser(EventProducer):
             self._reading_print = False
         elif self._reading_print:
             print(line.decode("UTF-8", "ignore")[:-1])
+        elif line[:2] == b'!t':
+            measured_time = int(round(time.time() * 1000))
+            if line[2] == 50:
+                print("sent wifi '{}'\n".format(measured_time))
+            elif line[2] == 51:
+                print("sent rpl '{}'\n".format(measured_time))
+            elif line[2] == 52:
+                print("R forwarded rpl '{}'\n".format(measured_time))
+            elif line[2] == 53:
+                print("R forwarded wifi '{}'\n".format(measured_time))
+            elif line[2] == 55:
+                print("W forwarded rpl '{}'\n".format(measured_time))
+            elif line[2] == 56:
+                print("W forwarded wifi '{}'\n".format(measured_time))
+            elif line[2] == 57:
+                print("received over wifi '{}'\n".format(measured_time))
+            elif line[2] == 58:
+                print("received over rpl '{}'\n".format(measured_time))
         # sends contiki addresses
         elif line[:2] == b'!r':
             line = line.decode("UTF-8", "ignore")
