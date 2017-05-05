@@ -82,21 +82,21 @@ class SerialParser(EventProducer):
             print(line.decode("UTF-8", "ignore")[:-1])
         elif line[:2] == b'!t':
             measured_time = int(round(time.time() * 1000))
-            if line[2] == 50:
+            if line[:3] == b'!t1':
                 print("sent wifi '{}'\n".format(measured_time))
-            elif line[2] == 51:
+            elif line[:3] == b'!t2':
                 print("sent rpl '{}'\n".format(measured_time))
-            elif line[2] == 52:
+            elif line[:3] == b'!t3':
                 print("R forwarded rpl '{}'\n".format(measured_time))
-            elif line[2] == 53:
+            elif line[:3] == b'!t4':
                 print("R forwarded wifi '{}'\n".format(measured_time))
-            elif line[2] == 55:
+            elif line[:3] == b'!t5':
                 print("W forwarded rpl '{}'\n".format(measured_time))
-            elif line[2] == 56:
+            elif line[:3] == b'!t6':
                 print("W forwarded wifi '{}'\n".format(measured_time))
-            elif line[2] == 57:
+            elif line[:3] == b'!t7':
                 print("received over wifi '{}'\n".format(measured_time))
-            elif line[2] == 58:
+            elif line[:3] == b'!t8':
                 print("received over rpl '{}'\n".format(measured_time))
         # sends contiki addresses
         elif line[:2] == b'!r':
