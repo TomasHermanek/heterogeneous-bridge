@@ -52,6 +52,14 @@ class ResponseToPacketRequest(Event):
         return "response-to-packet-request-event"
 
 
+class HelloBridgeRequestEvent(Event):
+    def __init__(self):
+        Event.__init__(self, None)
+
+    def __str__(self):
+        return "hello-bridge-request-event"
+
+
 class SerialParser(EventProducer):
     """
     SerialParser is responsible for parse of data received over serial line. Data are separated into these groups:
@@ -70,6 +78,7 @@ class SerialParser(EventProducer):
         self.add_event_support(MoteGlobalAddressEvent)
         self.add_event_support(RequestRouteToMoteEvent)
         self.add_event_support(ResponseToPacketRequest)
+        self.add_event_support(HelloBridgeRequestEvent)
         self._reading_print = False
 
     def parse(self, line):
@@ -83,9 +92,9 @@ class SerialParser(EventProducer):
         elif line[:2] == b'!t':
             measured_time = int(round(time.time() * 1000))
             if line[:3] == b'!t1':
-                print("sent wifi '{}'\n".format(measured_time))
-            elif line[:3] == b'!t2':
                 print("sent rpl '{}'\n".format(measured_time))
+            elif line[:3] == b'!t2':
+                print("sent wifi '{}'\n".format(measured_time))
             elif line[:3] == b'!t3':
                 print("R forwarded rpl '{}'\n".format(measured_time))
             elif line[:3] == b'!t4':
@@ -98,6 +107,8 @@ class SerialParser(EventProducer):
                 print("received over wifi '{}'\n".format(measured_time))
             elif line[:3] == b'!t8':
                 print("received over rpl '{}'\n".format(measured_time))
+        elif line[:2] == b'?w':
+            self.notify_listeners(HelloBridgeRequestEvent())
         # sends contiki addresses
         elif line[:2] == b'!r':
             line = line.decode("UTF-8", "ignore")
@@ -238,6 +249,9 @@ class SerialCommands(EventListener):
         self._slip_sender.send(str.encode("!f;{}\n".format(contiki_packet.get_contiki_format())))
         logging.debug('BRIDGE:forwarding packet to contiki')
 
+    def _send_hello_response(self):
+        self._slip_sender.send(str.encode("$w\n"))
+
     def notify(self, event: Event):
         from interface_listener import PacketSendToSerialEvent, PacketForwardToSerialEvent
         from data import PacketBuffEvent
@@ -249,6 +263,8 @@ class SerialCommands(EventListener):
             self.forward_packet_to_contiki(event.get_event())
         elif isinstance(event, PacketBuffEvent):
             self.request_forward_packet_decision(event.get_event()["id"], event.get_event()["packet"])
+        elif isinstance(event, HelloBridgeRequestEvent):
+            self._send_hello_response()
 
     def __str__(self):
         return "slip-commands"

@@ -1,5 +1,5 @@
 from serial_connection import SerialListener, SerialSender, ContikiBootEvent, SerialPacketToSendEvent, SerialCommands, \
-    SerialParser, MoteGlobalAddressEvent, RequestRouteToMoteEvent, ResponseToPacketRequest
+    SerialParser, MoteGlobalAddressEvent, RequestRouteToMoteEvent, ResponseToPacketRequest, HelloBridgeRequestEvent
 from timers import NeighbourRequestTimer, PurgeTimer
 from interface_listener import InterfaceListener, Ipv6PacketParser, PacketSendToSerialEvent, PacketSender, \
     NeighbourSolicitationEvent, NeighbourAdvertisementEvent, RootPacketForwardEvent, PacketForwardToSerialEvent
@@ -71,6 +71,7 @@ class Boot(object):
         self._data.subscribe_event(ChangeModeEvent, self._ip_configurator)
         self._packet_buffer.subscribe_event(PacketBuffEvent, self._slip_commands)
         self._input_parser.subscribe_event(ResponseToPacketRequest, self._packet_buffer)
+        self._input_parser.subscribe_event(HelloBridgeRequestEvent, self._slip_commands)
 
     def _load_commands(self):
         self._command_listener.add_command(Command("node", self._node_table.print_table, "Shows node table"))
