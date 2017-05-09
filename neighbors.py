@@ -15,6 +15,9 @@ def none_to_str(s):
 
 
 class NodeAddress:
+    """
+    single record for NODE_TABLE
+    """
     DEFAULT_LIFETIME = 255
 
     def __init__(self, ip_address: IPv6Address, tech_type, l2_address=None):
@@ -73,6 +76,7 @@ class NodeAddress:
 class NewNodeEvent(Event):
     def __init__(self, data: NodeAddress):
         Event.__init__(self, data)
+        logging.info('BRIDGE:added new node address "{}"'.format(data))
 
     def __str__(self):
         return "new-node-event"
@@ -81,12 +85,16 @@ class NewNodeEvent(Event):
 class NodeRefreshEvent(Event):
     def __init__(self, data: NodeAddress):
         Event.__init__(self, data)
+        logging.info('BRIDGE:refreshed node address "{}"'.format(data))
 
     def __str__(self):
         return "node-refresh-event"
 
 
 class NodeTable(EventProducer):
+    """
+    Class which is represents NODE_TABLE
+    """
     WIFI_NODE_REFRESH_INTERVAL = math.floor(NodeAddress.DEFAULT_LIFETIME / 2)
 
     def __init__(self, types: list):
@@ -117,7 +125,6 @@ class NodeTable(EventProducer):
             self._nodes[node_address.get_tech_type()].update({
                 str(node_address.get_ip_address()): node_address
             })
-            logging.debug('BRIDGE:added new node address "{}"'.format(node_address))
             self.notify_listeners(NewNodeEvent(node_address))
         else:
             self._nodes[node_address.get_tech_type()][str(node_address.get_ip_address())].reset_lifetime()
@@ -154,6 +161,9 @@ class NodeTable(EventProducer):
 
 
 class PendingEntry(Thread):
+    """
+    Record in PendingSolicitations table. Runs as thread and dies after attempts exceeds
+    """
     MAX_ATTEMPTS = 4
     ATTEMPT_DELAY_MULTIPLICATION = 5
     STATUS_PENDING = 1
@@ -193,6 +203,9 @@ class PendingEntry(Thread):
 
 
 class PendingSolicitations:
+    """
+    Table which manages ICMPv6 neighbor solicitations
+    """
     def __init__(self):
         self._pendings = {}
 
@@ -229,6 +242,9 @@ class PendingSolicitations:
 
 
 class NeighborManager(EventListener):
+    """
+    Service for management neighbor in NodeTable
+    """
     def __init__(self, node_table: NodeTable, data: Data, pendings: PendingSolicitations, packet_sender: PacketSender,
                  slip_commands):
         EventListener.__init__(self)

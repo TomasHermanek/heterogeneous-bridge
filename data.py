@@ -9,12 +9,16 @@ from packet import ContikiPacket
 class PacketBuffEvent(Event):
     def __init__(self, data: dict):
         Event.__init__(self, data)
+        logging.debug("BRIDGE: new packet in buffer")
 
     def __str__(self):
         return "packet-buff-event"
 
 
 class PacketBuffer(EventProducer, EventListener):       # todo create packet buffer maximum limit
+    """
+    Buffer which stores packets, which waits for routing decision received over serial line
+    """
     def __init__(self):
         from serial_connection import SerialPacketToSendEvent
         self.counter = 1
@@ -31,7 +35,7 @@ class PacketBuffer(EventProducer, EventListener):       # todo create packet buf
         self._packets.update({
             self.counter: packet
         })
-        self.notify_listeners(PacketBuffEvent({     # todo change this
+        self.notify_listeners(PacketBuffEvent({
             "id": self.counter,
             "packet": packet
         }))
@@ -68,12 +72,16 @@ class PacketBuffer(EventProducer, EventListener):       # todo create packet buf
 class ChangeModeEvent(Event):
     def __init__(self, data: int):
         Event.__init__(self, data)
+        logging.info('CONTIKI: sets node mode to "{}"'.format(data))
 
     def __str__(self):
         return "change-mode-event"
 
 
 class Data(EventProducer):
+    """
+    Provides simple place for storing base node data
+    """
     MODE_ROOT = 1
     MODE_NODE = 2
 

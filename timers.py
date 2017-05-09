@@ -5,6 +5,9 @@ import time
 
 
 class NeighbourRequestTimer(Thread):
+    """
+    Timer for sending request periodically over serial line
+    """
     def __init__(self, request_time: int, slip_commands: SerialCommands):
         Thread.__init__(self)
         self._neighbours_request_time = request_time
@@ -18,6 +21,9 @@ class NeighbourRequestTimer(Thread):
 
 
 class PurgeTimer(Thread):
+    """
+    Timer responsible for decreasing lifetime of records
+    """
     def __init__(self, purging_interval: int, node_table: NodeTable):
         Thread.__init__(self)
         self._purging_interval = purging_interval
@@ -26,5 +32,4 @@ class PurgeTimer(Thread):
     def run(self):
         while 1:
             self._node_table.decrease_lifetime()
-            # print(self._node_table)
             time.sleep(self._purging_interval)

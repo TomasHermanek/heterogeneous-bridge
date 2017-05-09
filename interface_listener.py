@@ -3,12 +3,13 @@ from scapy.all import *
 from data import Data
 from event_system import EventListener, Event, EventProducer
 from packet import ContikiPacket
-import ipaddress
+import logging
 
 
 class PacketSendToSerialEvent(Event):
     def __init__(self, data: ContikiPacket):
         Event.__init__(self, data)
+        logging.debug('BRIDGE:Packet send to serial event')
 
     def __str__(self):
         return "incoming-packet-to-slip-event"
@@ -17,6 +18,7 @@ class PacketSendToSerialEvent(Event):
 class PacketForwardToSerialEvent(Event):
     def __init__(self, data: ContikiPacket):
         Event.__init__(self, data)
+        logging.debug('BRIDGE:Packet forward to serial event')
 
     def __str__(self):
         return "packet-forward-to-serial-event"
@@ -25,6 +27,8 @@ class PacketForwardToSerialEvent(Event):
 class NeighbourSolicitationEvent(Event):
     def __init__(self, data: dict):
         Event.__init__(self, data)
+        logging.debug('BRIDGE:Sending response to ICMPv6 neighbour solicitation for address "{}"'
+                      .format(data['target_ip']))
 
     def __str__(self):
         return "mote-neighbour-solicitation-event"
@@ -33,6 +37,7 @@ class NeighbourSolicitationEvent(Event):
 class NeighbourAdvertisementEvent(Event):
     def __init__(self, data: dict):
         Event.__init__(self, data)
+        logging.debug('BRIDGE:Received ICMPv6 NA for ip"{}"'.format(data['src_l2_addr']))
 
     def __str__(self):
         return "neighbour-advertisement-event"
@@ -41,12 +46,16 @@ class NeighbourAdvertisementEvent(Event):
 class RootPacketForwardEvent(Event):
     def __init__(self, data: ContikiPacket):
         Event.__init__(self, data)
+        logging.debug('BRIDGE:Asking for forward decision for packet "{}"'.format(data.get_contiki_format()))
 
     def __str__(self):
         return "root-packet-forward"
 
 
 class Ipv6PacketParser(EventProducer):
+    """
+    Class responsible for parsing some kind of packet formats
+    """
     def __init__(self, data: Data, node_table):
         EventProducer.__init__(self)
         self._data = data
@@ -66,13 +75,6 @@ class Ipv6PacketParser(EventProducer):
         contiki_packet.set_scapy_format(packet)
 
         ip = packet[IPv6]
-        udp = packet[UDP]
-        raw = packet[Raw]
-        src_addr = ipaddress.ip_address(ip[1].src)
-        dst_addr = ipaddress.ip_address(ip[1].dst)
-        # contiki_packet = "{};{};{};{};{}".format(src_addr.exploded, dst_addr.exploded, udp.sport, udp.dport,
-        #                                          raw.load.decode("UTF-8", "ignore"))
-        # print(contiki_packet.get_contiki_format())
 
         if self._data.get_mode() == Data.MODE_ROOT and ip[0].dst == self._data.get_configuration()['border-router']['ipv6']:
             ask = False
@@ -99,8 +101,6 @@ class Ipv6PacketParser(EventProducer):
         # i I am root and solicitation wants to get root address or solicitation wants my mote address
         if (self._data.get_mode() == Data.MODE_ROOT and self._data.get_configuration()['border-router']['ipv6'] == target_ip)\
                 or (str(self._data.get_mote_global_address()) == target_ip or str(self._data.get_mote_link_local_address()) == target_ip):
-            logging.warning('BRIDGE:Sending response to ICMPv6 neighbour solicitation for address "{}"'
-                            .format(target_ip))
             self.notify_listeners(NeighbourSolicitationEvent({
                 "src_l2": src_l2,
                 "src_ip": src_ip,
@@ -122,7 +122,7 @@ class Ipv6PacketParser(EventProducer):
             return
         if IPv6 in packet and UDP in packet:
             try:
-                packet[IPv6][1].dst
+                packet[IPv6][1].dst     # stupid solution for checking dst packet address
                 self._parse_udp(packet)
             except Exception as e:
                 logging.error('BRIDGE:{}'.format(str(e)))
@@ -133,6 +133,9 @@ class Ipv6PacketParser(EventProducer):
 
 
 class PacketSender(EventListener):
+    """
+    Class is reponsible for sending packet over WiFi interface, sending ICMPv6 NS,NA
+    """
     def __init__(self, iface, data: Data, node_table):
         self.iface = iface
         self._data = data
@@ -163,9 +166,6 @@ class PacketSender(EventListener):
             packet[IPv6][0].src = self._data.get_wifi_global_address()
             packet[IPv6][0].dst = dst_ip
             try:
-                # packet = ether / ip_w / ip_r / udp / values[4]
-                # print(packet.show())
-                # print("packet contiki format {}\n".format(contiki_packet.get_contiki_format()))
                 sendp(packet, verbose=False, iface=self.iface)
             except Exception:
                 print(packet.show())
@@ -179,7 +179,6 @@ class PacketSender(EventListener):
         ether.src = self._data.get_wifi_l2_address()
         ip = IPv6()
         ip.src = self._data.get_wifi_global_address()
-        # print("sending icmp using global ip {}".format(self._data.get_wifi_global_address()))
         ip.dst = "ff02::1"
         icmp = ICMPv6ND_NS()
         icmp.tgt = ip_addr
@@ -190,7 +189,6 @@ class PacketSender(EventListener):
         ether = Ether()
         ether.src = self._data.get_wifi_l2_address()
         ether.dst = src_l2
-        # print("sending NA: srcip: {} target_ip:{} global_{}".format(src_ip, target_ip, self._data.get_wifi_global_address()))
         ip = IPv6()
         ip.src = self._data.get_wifi_global_address()
         ip.dst = src_ip
@@ -201,11 +199,6 @@ class PacketSender(EventListener):
     def notify(self, event: Event):
         from serial_connection import SerialPacketToSendEvent
         if isinstance(event, SerialPacketToSendEvent):
-            # if not self._data.get_mote_global_address():
-            #     logging.warning('BRIDGE:Src IPv6 address of contiki device is unknown can not send packet')
-            #     return
-            # packet_to_send = event.get_event()
-            # packet_to_send_decoded = packet_to_send[3:-1].decode("UTF-8", "ignore")
             self.send_packet(event.get_event())
 
     def __str__(self):
@@ -213,6 +206,9 @@ class PacketSender(EventListener):
 
 
 class InterfaceListener(Thread):
+    """
+    Thread which listens for incoming packet on WiFi interface
+    """
     def __init__(self, iface, packet_parser: Ipv6PacketParser):
         Thread.__init__(self)
         self.iface = iface

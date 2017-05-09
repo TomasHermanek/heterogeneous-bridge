@@ -2,6 +2,9 @@ from threading import Thread
 
 
 class Command:
+    """
+    Defines single commands which is used by command line
+    """
     def __init__(self, command_string: str, class_method, help_text: str):
         self._command_string = command_string
         self._class_method = class_method
@@ -18,6 +21,9 @@ class Command:
 
 
 class CommandListener(Thread):
+    """
+    Thread which listens for commands on command line
+    """
     def __init__(self):
         Thread.__init__(self)
         self.commands = {}

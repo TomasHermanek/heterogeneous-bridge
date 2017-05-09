@@ -15,6 +15,9 @@ import logging
 
 
 class Boot(object):
+    """
+    Initialize class for bridge application
+    """
     _pwd = os.getcwd()
     _tech_types = ['wifi', 'rpl']
 

@@ -6,13 +6,13 @@ from packet import ContikiPacket
 import logging
 import serial
 import ipaddress
-
 import time
 
 
 class ContikiBootEvent(Event):
     def __init__(self, line: str):
         Event.__init__(self, line)
+        logging.info('CONTIKI: contiki device is booting')
 
     def __str__(self):
         return "contiki-boot-event"
@@ -21,6 +21,7 @@ class ContikiBootEvent(Event):
 class SerialPacketToSendEvent(Event):
     def __init__(self, data: ContikiPacket):
         Event.__init__(self, data)
+        logging.debug('BRIDGE:incoming packet to send')
 
     def __str__(self):
         return "slip-packet-to-send-event"
@@ -47,6 +48,7 @@ class RequestRouteToMoteEvent(Event):
 class ResponseToPacketRequest(Event):
     def __init__(self, data: dict):
         Event.__init__(self, data)
+        logging.debug('CONTIKI: sending response "{}" to path id: "{}"'.format(data["response"], data['question_id']))
 
     def __str__(self):
         return "response-to-packet-request-event"
@@ -57,6 +59,7 @@ class HelloBridgeRequestEvent(Event):
         Event.__init__(self, None)
 
     def __str__(self):
+        logging.info('CONTIKI: sending hello message')
         return "hello-bridge-request-event"
 
 
@@ -144,12 +147,9 @@ class SerialParser(EventProducer):
         elif line[:2] == b'!p':
             contiki_packet = ContikiPacket()
             contiki_packet.set_contiki_format(line[3:-1].decode("UTF-8"))
-            # print(contiki_packet.get_contiki_format())
             self.notify_listeners(SerialPacketToSendEvent(contiki_packet))
-            logging.debug('BRIDGE:incoming packet to send')
         elif line[:2] == b'!b':
             self.notify_listeners(ContikiBootEvent(line))
-            logging.info('BRIDGE:contiki is rebooting')
         elif line[:2] == b'!c':
             self._data.set_mode(int(line[2:-1]))
             logging.info('BRIDGE:bridge runs in mode {}'.format(line[2:-1]))
@@ -194,16 +194,21 @@ class SerialListener(Thread):
 
 
 class SerialSender:
+    """
+    Simple class which is responsible for making serial connection and sending data over
+    """
     def __init__(self, device: str):
         self._ser = serial.Serial(port=device, baudrate=115200, parity=serial.PARITY_NONE,
                                   stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=0)
 
     def send(self, msg: bytes):
         self._ser.write(msg)
-        # print(msg)
 
 
 class SerialCommands(EventListener):
+    """
+    Defines messages which are send over serial line
+    """
     def __init__(self, slip_sender: SerialSender, data: Data):
         self._slip_sender = slip_sender
         self._data = data
